@@ -3,7 +3,6 @@ import {
   Activity,
   AlertTriangle,
   Boxes,
-  CheckCircle2,
   ClipboardList,
   Clock,
   LayoutDashboard,
@@ -604,8 +603,4 @@ function countByStatus(items: Status[]) {
     },
     { green: 0, yellow: 0, red: 0 } as Record<Status, number>,
   );
-}
-
-function CheckCircle2Inline() {
-  return <CheckCircle2 className="size-4" />;
 }
