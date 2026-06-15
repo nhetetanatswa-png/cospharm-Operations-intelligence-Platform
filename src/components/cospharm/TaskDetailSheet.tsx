@@ -43,10 +43,11 @@ export function TaskDetailSheet({
   }, [task]);
 
   if (!task) return null;
+  const t: Task = task;
 
   const canUpdateAny = can(role, "task.update.any");
   const canUpdateAssigned = can(role, "task.update.assigned");
-  const isAssignee = task.assignee === user.name;
+  const isAssignee = t.assignee === user.name;
   const canEdit = canUpdateAny || (canUpdateAssigned && isAssignee);
   const greenNeedsComment = next === "green" && comment.trim().length < 4;
 
@@ -56,11 +57,11 @@ export function TaskDetailSheet({
       setError("A comment or evidence note is required before marking this task green.");
       return;
     }
-    if (next !== task.status && comment.trim().length < 1) {
+    if (next !== t.status && comment.trim().length < 1) {
       setError("Please add a short comment describing the change.");
       return;
     }
-    onUpdate(task, next, comment.trim() || task.note || "");
+    onUpdate(t, next, comment.trim() || t.note || "");
     onClose();
   }
 
@@ -69,12 +70,12 @@ export function TaskDetailSheet({
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-xs text-muted-foreground">{task.id}</span>
-            <StatusBadge status={task.status} />
+            <span className="font-mono text-xs text-muted-foreground">{t.id}</span>
+            <StatusBadge status={t.status} />
           </div>
-          <SheetTitle className="text-left text-lg">{task.title}</SheetTitle>
+          <SheetTitle className="text-left text-lg">{t.title}</SheetTitle>
           <SheetDescription className="text-left">
-            Assigned to <span className="font-medium text-foreground">{task.assignee}</span> · {task.shift} shift · due {task.due}
+            Assigned to <span className="font-medium text-foreground">{t.assignee}</span> · {t.shift} shift · due {t.due}
           </SheetDescription>
         </SheetHeader>
 
@@ -82,7 +83,7 @@ export function TaskDetailSheet({
           <section>
             <h3 className="mb-2 text-sm font-semibold">Current note</h3>
             <p className="rounded-md border bg-secondary/50 p-3 text-sm text-muted-foreground">
-              {task.note || "No note recorded yet."}
+              {t.note || "No note recorded yet."}
             </p>
           </section>
 
@@ -151,7 +152,7 @@ export function TaskDetailSheet({
                   <Button variant="ghost" onClick={onClose}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSubmit} disabled={next === task.status && !comment.trim()}>
+                  <Button onClick={handleSubmit} disabled={next === t.status && !comment.trim()}>
                     Save update
                   </Button>
                 </div>
