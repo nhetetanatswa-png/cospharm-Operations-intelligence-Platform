@@ -31,6 +31,7 @@ import { StockUpdateDialog } from "./StockUpdateDialog";
 import { AuditTrailCard } from "./AuditTrailCard";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import type { AuditEntry, CurrentUser, Role, StockItem, Task } from "./types";
+import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
 const INITIAL_TASKS: Task[] = [
   { id: "T-1042", title: "Morning cold-chain temperature log", assignee: "Ada Bello", shift: "Morning", due: "07:30", status: "green", note: "All readings within range." },
@@ -609,13 +610,19 @@ function Header({
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2.5">
-          <div className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Pill className="size-5" />
-          </div>
+        <div className="flex items-center gap-3">
+          <img
+            src={cospharmLogo.url}
+            alt="Cospharm logo"
+            className="size-11 object-contain"
+          />
           <div>
-            <p className="text-sm font-semibold leading-tight">Cospharm</p>
-            <p className="text-xs text-muted-foreground leading-tight">Operations console</p>
+            <p className="text-base font-semibold leading-tight tracking-tight text-primary">
+              Cospharm
+            </p>
+            <p className="text-[11px] font-medium italic leading-tight text-status-red">
+              Believe in Good
+            </p>
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
