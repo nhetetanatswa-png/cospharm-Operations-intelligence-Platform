@@ -1,29 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CospharmDashboard } from "@/components/cospharm/Dashboard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Cospharm Operations — Tasks & Stock Dashboard" },
+      { name: "description", content: "Live traffic-light dashboard for Cospharm staff and supervisors to track daily tasks, stock health, and operational risks." },
+      { property: "og:title", content: "Cospharm Operations Dashboard" },
+      { property: "og:description", content: "Traffic-light monitoring for daily tasks and stock condition." },
     ],
   }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
+  return <CospharmDashboard />;
 }

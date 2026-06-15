@@ -46,6 +46,12 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
+  --color-status-green: var(--status-green);
+  --color-status-green-foreground: var(--status-green-foreground);
+  --color-status-yellow: var(--status-yellow);
+  --color-status-yellow-foreground: var(--status-yellow-foreground);
+  --color-status-red: var(--status-red);
+  --color-status-red-foreground: var(--status-red-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -63,25 +69,33 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  /* Cospharm palette: blue, white, grey, red */
+  --background: oklch(0.985 0.005 240);
+  --foreground: oklch(0.22 0.04 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.22 0.04 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --popover-foreground: oklch(0.22 0.04 250);
+  --primary: oklch(0.45 0.17 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.012 250);
+  --secondary-foreground: oklch(0.30 0.06 255);
+  --muted: oklch(0.955 0.012 250);
+  --muted-foreground: oklch(0.50 0.03 255);
+  --accent: oklch(0.93 0.04 255);
+  --accent-foreground: oklch(0.30 0.08 255);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.90 0.015 250);
+  --input: oklch(0.90 0.015 250);
+  --ring: oklch(0.55 0.15 255);
+  /* Traffic-light status tokens */
+  --status-green: oklch(0.68 0.17 145);
+  --status-green-foreground: oklch(0.20 0.05 145);
+  --status-yellow: oklch(0.82 0.16 85);
+  --status-yellow-foreground: oklch(0.30 0.07 70);
+  --status-red: oklch(0.60 0.22 27);
+  --status-red-foreground: oklch(0.99 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
