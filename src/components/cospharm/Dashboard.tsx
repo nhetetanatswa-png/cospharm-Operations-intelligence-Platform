@@ -5,7 +5,9 @@ import {
   Boxes,
   ClipboardList,
   Clock,
+  History,
   LayoutDashboard,
+  Lock,
   Pill,
   Plus,
   Search,
@@ -22,43 +24,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge, StatusDot, type Status } from "./StatusBadge";
+import { TaskDetailSheet } from "./TaskDetailSheet";
+import { StockUpdateDialog } from "./StockUpdateDialog";
+import { AuditTrailCard } from "./AuditTrailCard";
+import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
+import type { AuditEntry, CurrentUser, Role, StockItem, Task } from "./types";
 
-type Task = {
-  id: string;
-  title: string;
-  assignee: string;
-  shift: "Morning" | "Afternoon" | "Night";
-  due: string;
-  status: Status;
-  note?: string;
-};
-
-type StockItem = {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  onHand: number;
-  reorder: number;
-  capacity: number;
-  expiry: string;
-  status: Status;
-  issue?: string;
-};
-
-const TASKS: Task[] = [
-  { id: "T-1042", title: "Morning cold-chain temperature log", assignee: "Ada Bello", shift: "Morning", due: "07:30", status: "green" },
+const INITIAL_TASKS: Task[] = [
+  { id: "T-1042", title: "Morning cold-chain temperature log", assignee: "Ada Bello", shift: "Morning", due: "07:30", status: "green", note: "All readings within range." },
   { id: "T-1043", title: "Restock dispensary shelves A–C", assignee: "John Mensah", shift: "Morning", due: "09:00", status: "yellow", note: "Started — shelf C pending" },
-  { id: "T-1044", title: "Sign off overnight delivery manifest", assignee: "Supervisor", shift: "Morning", due: "08:00", status: "red", note: "Not signed — driver waiting" },
-  { id: "T-1045", title: "Controlled drugs cabinet count", assignee: "Grace Okoye", shift: "Morning", due: "10:00", status: "green" },
+  { id: "T-1044", title: "Sign off overnight delivery manifest", assignee: "Mary Adeyemi", shift: "Morning", due: "08:00", status: "red", note: "Not signed — driver waiting" },
+  { id: "T-1045", title: "Controlled drugs cabinet count", assignee: "Grace Okoye", shift: "Morning", due: "10:00", status: "green", note: "Counts match register." },
   { id: "T-1046", title: "Clean & sanitise compounding bench", assignee: "Tunde Aliu", shift: "Afternoon", due: "13:00", status: "yellow", note: "In progress" },
-  { id: "T-1047", title: "Patient delivery batch #B-228", assignee: "Logistics", shift: "Afternoon", due: "14:30", status: "red", note: "2 items short — see stock" },
-  { id: "T-1048", title: "Equipment calibration check", assignee: "Ada Bello", shift: "Afternoon", due: "15:00", status: "green" },
-  { id: "T-1049", title: "End-of-day handover log", assignee: "Supervisor", shift: "Night", due: "20:00", status: "yellow", note: "Awaiting pharmacist sign-off" },
+  { id: "T-1047", title: "Patient delivery batch #B-228", assignee: "John Mensah", shift: "Afternoon", due: "14:30", status: "red", note: "2 items short — see stock" },
+  { id: "T-1048", title: "Equipment calibration check", assignee: "Ada Bello", shift: "Afternoon", due: "15:00", status: "green", note: "Calibrated, certificate filed." },
+  { id: "T-1049", title: "End-of-day handover log", assignee: "Mary Adeyemi", shift: "Night", due: "20:00", status: "yellow", note: "Awaiting pharmacist sign-off" },
 ];
 
-const STOCK: StockItem[] = [
+const INITIAL_STOCK: StockItem[] = [
   { id: "S-001", name: "Paracetamol 500mg", sku: "PCM-500", category: "Analgesics", onHand: 1240, reorder: 400, capacity: 2000, expiry: "2027-04", status: "green" },
   { id: "S-002", name: "Amoxicillin 250mg", sku: "AMX-250", category: "Antibiotics", onHand: 320, reorder: 500, capacity: 1500, expiry: "2026-09", status: "yellow", issue: "Below reorder level" },
   { id: "S-003", name: "Insulin Glargine 100IU", sku: "INS-GLA", category: "Cold chain", onHand: 28, reorder: 60, capacity: 200, expiry: "2026-03", status: "red", issue: "Critically low — affects 3 deliveries" },
@@ -77,23 +62,132 @@ const STAFF = [
   { name: "Mary Adeyemi", role: "Supervisor", shift: "All-day", tasksDone: 7, tasksPending: 2 },
 ];
 
+const ROLE_USERS: Record<Role, CurrentUser> = {
+  admin: { name: "Olu Adebayo", role: "admin" },
+  supervisor: { name: "Mary Adeyemi", role: "supervisor" },
+  staff: { name: "John Mensah", role: "staff" },
+};
+
+const seedAudit = (): AuditEntry[] => [
+  {
+    id: "A-001",
+    entityType: "task",
+    entityId: "T-1045",
+    entityLabel: "Controlled drugs cabinet count",
+    field: "status",
+    oldValue: "yellow",
+    newValue: "green",
+    user: "Grace Okoye",
+    role: "staff",
+    comment: "Counts match register; witnessed by supervisor.",
+    timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+  },
+  {
+    id: "A-002",
+    entityType: "stock",
+    entityId: "S-006",
+    entityLabel: "Ceftriaxone 1g Vial",
+    field: "issue",
+    oldValue: "—",
+    newValue: "12 units damaged on receipt",
+    user: "John Mensah",
+    role: "staff",
+    comment: "Damage report filed against shipment INV-9921.",
+    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+  },
+];
+
 export function CospharmDashboard() {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
+  const [role, setRole] = useState<Role>("supervisor");
+  const currentUser = ROLE_USERS[role];
 
-  const taskStats = useMemo(() => countByStatus(TASKS.map((t) => t.status)), []);
-  const stockStats = useMemo(() => countByStatus(STOCK.map((s) => s.status)), []);
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [stock, setStock] = useState<StockItem[]>(INITIAL_STOCK);
+  const [audit, setAudit] = useState<AuditEntry[]>(seedAudit);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
 
-  const filteredTasks = TASKS.filter((t) =>
+  const visibleTasks = useMemo(() => {
+    if (role === "staff") {
+      return tasks.filter((t) => t.assignee === currentUser.name);
+    }
+    return tasks;
+  }, [tasks, role, currentUser.name]);
+
+  const taskStats = useMemo(() => countByStatus(visibleTasks.map((t) => t.status)), [visibleTasks]);
+  const stockStats = useMemo(() => countByStatus(stock.map((s) => s.status)), [stock]);
+
+  const filteredTasks = visibleTasks.filter((t) =>
     [t.title, t.assignee, t.id].join(" ").toLowerCase().includes(search.toLowerCase()),
   );
-  const filteredStock = STOCK.filter((s) =>
+  const filteredStock = stock.filter((s) =>
     [s.name, s.sku, s.category].join(" ").toLowerCase().includes(search.toLowerCase()),
   );
 
+  function logAudit(entry: Omit<AuditEntry, "id" | "timestamp" | "user" | "role">) {
+    setAudit((prev) => [
+      {
+        ...entry,
+        id: `A-${String(prev.length + 100).padStart(3, "0")}`,
+        user: currentUser.name,
+        role: currentUser.role,
+        timestamp: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }
+
+  function updateTaskStatus(task: Task, next: Status, comment: string) {
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next, note: comment } : t)));
+    logAudit({
+      entityType: "task",
+      entityId: task.id,
+      entityLabel: task.title,
+      field: "status",
+      oldValue: task.status,
+      newValue: next,
+      comment,
+    });
+  }
+
+  function updateStock(item: StockItem, next: { onHand: number; issue?: string; status: Status }, comment: string) {
+    setStock((prev) =>
+      prev.map((s) =>
+        s.id === item.id ? { ...s, onHand: next.onHand, issue: next.issue, status: next.status } : s,
+      ),
+    );
+    if (next.onHand !== item.onHand) {
+      logAudit({
+        entityType: "stock",
+        entityId: item.id,
+        entityLabel: item.name,
+        field: "onHand",
+        oldValue: String(item.onHand),
+        newValue: String(next.onHand),
+        comment,
+      });
+    }
+    if ((next.issue ?? "") !== (item.issue ?? "")) {
+      logAudit({
+        entityType: "stock",
+        entityId: item.id,
+        entityLabel: item.name,
+        field: "issue",
+        oldValue: item.issue ?? "—",
+        newValue: next.issue ?? "—",
+        comment,
+      });
+    }
+  }
+
+  const openTask = tasks.find((t) => t.id === openTaskId) ?? null;
+  const taskAudit = audit.filter((a) => a.entityType === "task" && a.entityId === openTaskId);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Header />
+      <Header role={role} setRole={setRole} user={currentUser} />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -101,7 +195,8 @@ export function CospharmDashboard() {
               Operations dashboard
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Live traffic-light view of today's tasks, stock condition, and risks.
+              Signed in as <span className="font-medium text-foreground">{currentUser.name}</span> ·{" "}
+              {ROLE_LABEL[role]} — {ROLE_DESCRIPTION[role]}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -114,14 +209,16 @@ export function CospharmDashboard() {
                 className="w-64 pl-9"
               />
             </div>
-            <Button variant="default" className="gap-1.5">
-              <Plus className="size-4" /> New
-            </Button>
+            {can(role, "task.create") ? (
+              <Button variant="default" className="gap-1.5">
+                <Plus className="size-4" /> New
+              </Button>
+            ) : null}
           </div>
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 sm:w-auto sm:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 sm:w-auto sm:inline-grid">
             <TabsTrigger value="overview" className="gap-1.5">
               <LayoutDashboard className="size-4" /> Overview
             </TabsTrigger>
@@ -131,7 +228,10 @@ export function CospharmDashboard() {
             <TabsTrigger value="stock" className="gap-1.5">
               <Boxes className="size-4" /> Stock
             </TabsTrigger>
-            <TabsTrigger value="admin" className="gap-1.5">
+            <TabsTrigger value="audit" className="gap-1.5">
+              <History className="size-4" /> Audit
+            </TabsTrigger>
+            <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
               <UserCog className="size-4" /> Admin
             </TabsTrigger>
           </TabsList>
@@ -140,8 +240,8 @@ export function CospharmDashboard() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KpiCard
                 icon={<ClipboardList className="size-5" />}
-                label="Tasks today"
-                value={TASKS.length}
+                label={role === "staff" ? "My tasks today" : "Tasks today"}
+                value={visibleTasks.length}
                 sub={`${taskStats.green} completed`}
               />
               <KpiCard
@@ -161,8 +261,8 @@ export function CospharmDashboard() {
               <KpiCard
                 icon={<ShieldCheck className="size-5" />}
                 label="Stock healthy"
-                value={`${Math.round((stockStats.green / STOCK.length) * 100)}%`}
-                sub={`${stockStats.green}/${STOCK.length} items green`}
+                value={`${Math.round((stockStats.green / stock.length) * 100)}%`}
+                sub={`${stockStats.green}/${stock.length} items green`}
                 tone="green"
               />
             </div>
@@ -178,25 +278,30 @@ export function CospharmDashboard() {
                 <CardContent>
                   <StatusBars
                     rows={[
-                      { label: "Completed", count: taskStats.green, total: TASKS.length, status: "green" },
-                      { label: "In progress", count: taskStats.yellow, total: TASKS.length, status: "yellow" },
-                      { label: "Overdue / not done", count: taskStats.red, total: TASKS.length, status: "red" },
+                      { label: "Completed", count: taskStats.green, total: visibleTasks.length, status: "green" },
+                      { label: "In progress", count: taskStats.yellow, total: visibleTasks.length, status: "yellow" },
+                      { label: "Overdue / not done", count: taskStats.red, total: visibleTasks.length, status: "red" },
                     ]}
                   />
                   <Separator className="my-5" />
                   <ul className="space-y-3">
-                    {TASKS.filter((t) => t.status !== "green")
+                    {visibleTasks.filter((t) => t.status !== "green")
                       .slice(0, 4)
                       .map((t) => (
-                        <li key={t.id} className="flex items-start gap-3">
-                          <StatusDot status={t.status} className="mt-1.5" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{t.title}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {t.assignee} · due {t.due} · {t.note}
-                            </p>
-                          </div>
-                          <StatusBadge status={t.status} />
+                        <li key={t.id}>
+                          <button
+                            onClick={() => setOpenTaskId(t.id)}
+                            className="flex w-full items-start gap-3 rounded-md p-1.5 text-left transition hover:bg-secondary/60"
+                          >
+                            <StatusDot status={t.status} className="mt-1.5" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">{t.title}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {t.assignee} · due {t.due} · {t.note}
+                              </p>
+                            </div>
+                            <StatusBadge status={t.status} />
+                          </button>
                         </li>
                       ))}
                   </ul>
@@ -210,14 +315,14 @@ export function CospharmDashboard() {
                 <CardContent>
                   <StatusBars
                     rows={[
-                      { label: "Healthy", count: stockStats.green, total: STOCK.length, status: "green" },
-                      { label: "Low / minor issue", count: stockStats.yellow, total: STOCK.length, status: "yellow" },
-                      { label: "Critical", count: stockStats.red, total: STOCK.length, status: "red" },
+                      { label: "Healthy", count: stockStats.green, total: stock.length, status: "green" },
+                      { label: "Low / minor issue", count: stockStats.yellow, total: stock.length, status: "yellow" },
+                      { label: "Critical", count: stockStats.red, total: stock.length, status: "red" },
                     ]}
                   />
                   <Separator className="my-5" />
                   <ul className="space-y-3">
-                    {STOCK.filter((s) => s.status === "red").map((s) => (
+                    {stock.filter((s) => s.status === "red").map((s) => (
                       <li key={s.id} className="flex items-start gap-3">
                         <Pill className="mt-0.5 size-4 text-status-red" />
                         <div className="min-w-0 flex-1">
@@ -263,14 +368,18 @@ export function CospharmDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-semibold">All tasks</CardTitle>
+                  <CardTitle className="text-base font-semibold">
+                    {role === "staff" ? "My tasks" : "All tasks"}
+                  </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Green = completed & logged · Yellow = started, attention needed · Red = not done or overdue.
+                    Click any row to view detail and audit history. Marking a task green requires a comment.
                   </p>
                 </div>
-                <Button size="sm" className="gap-1.5">
-                  <Plus className="size-4" /> Log task
-                </Button>
+                {can(role, "task.create") ? (
+                  <Button size="sm" className="gap-1.5">
+                    <Plus className="size-4" /> Log task
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <Table>
@@ -286,7 +395,11 @@ export function CospharmDashboard() {
                   </TableHeader>
                   <TableBody>
                     {filteredTasks.map((t) => (
-                      <TableRow key={t.id}>
+                      <TableRow
+                        key={t.id}
+                        onClick={() => setOpenTaskId(t.id)}
+                        className="cursor-pointer"
+                      >
                         <TableCell className="font-mono text-xs text-muted-foreground">{t.id}</TableCell>
                         <TableCell>
                           <div className="font-medium">{t.title}</div>
@@ -314,12 +427,19 @@ export function CospharmDashboard() {
                 <div>
                   <CardTitle className="text-base font-semibold">Stock condition</CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Green = healthy · Yellow = low or minor damage · Red = critically low, damaged, expired, or delivery-blocking.
+                    Every stock change is recorded in the audit trail with a comment.
                   </p>
                 </div>
-                <Button size="sm" variant="outline" className="gap-1.5">
-                  <Plus className="size-4" /> Report issue
-                </Button>
+                {can(role, "stock.report") ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => setStockDialog(stock[0])}
+                  >
+                    <Plus className="size-4" /> Report issue
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <Table>
@@ -330,12 +450,14 @@ export function CospharmDashboard() {
                       <TableHead>On hand</TableHead>
                       <TableHead className="w-[180px]">Level</TableHead>
                       <TableHead>Expiry</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredStock.map((s) => {
                       const pct = Math.min(100, Math.round((s.onHand / s.capacity) * 100));
+                      const canEdit = can(role, "stock.update");
+                      const canReport = can(role, "stock.report");
                       return (
                         <TableRow key={s.id}>
                           <TableCell>
@@ -355,7 +477,14 @@ export function CospharmDashboard() {
                           </TableCell>
                           <TableCell className="text-sm">{s.expiry}</TableCell>
                           <TableCell className="text-right">
-                            <StatusBadge status={s.status} />
+                            <div className="flex items-center justify-end gap-2">
+                              <StatusBadge status={s.status} />
+                              {canEdit || canReport ? (
+                                <Button size="sm" variant="ghost" onClick={() => setStockDialog(s)}>
+                                  {canEdit ? "Update" : "Report"}
+                                </Button>
+                              ) : null}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -366,63 +495,77 @@ export function CospharmDashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="audit">
+            <AuditTrailCard entries={audit} />
+          </TabsContent>
+
           <TabsContent value="admin" className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <KpiCard icon={<Users className="size-5" />} label="Staff active today" value={STAFF.length} sub="Across 3 shifts" />
-              <KpiCard icon={<ClipboardList className="size-5" />} label="Task templates" value={24} sub="Daily SOP catalog" />
-              <KpiCard icon={<Boxes className="size-5" />} label="Stock SKUs tracked" value={STOCK.length} sub="Live counts" />
-            </div>
+            {!can(role, "users.manage") ? (
+              <Card>
+                <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
+                  <Lock className="size-4" /> Admin tools are restricted to administrators.
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <KpiCard icon={<Users className="size-5" />} label="Staff active today" value={STAFF.length} sub="Across 3 shifts" />
+                  <KpiCard icon={<ClipboardList className="size-5" />} label="Task templates" value={24} sub="Daily SOP catalog" />
+                  <KpiCard icon={<Boxes className="size-5" />} label="Stock SKUs tracked" value={stock.length} sub="Live counts" />
+                </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-semibold">Staff & accountability</CardTitle>
-                <Button size="sm" variant="outline" className="gap-1.5">
-                  <Plus className="size-4" /> Add staff
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Shift</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead>Pending</TableHead>
-                      <TableHead className="text-right">Health</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {STAFF.map((p) => {
-                      const health: Status = p.tasksPending === 0 ? "green" : p.tasksPending > 1 ? "red" : "yellow";
-                      return (
-                        <TableRow key={p.name}>
-                          <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{p.role}</TableCell>
-                          <TableCell className="text-sm">{p.shift}</TableCell>
-                          <TableCell className="text-sm">{p.tasksDone}</TableCell>
-                          <TableCell className="text-sm">{p.tasksPending}</TableCell>
-                          <TableCell className="text-right">
-                            <StatusBadge status={health} />
-                          </TableCell>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-base font-semibold">Staff & accountability</CardTitle>
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <Plus className="size-4" /> Add staff
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Completed</TableHead>
+                          <TableHead>Pending</TableHead>
+                          <TableHead className="text-right">Health</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {STAFF.map((p) => {
+                          const health: Status = p.tasksPending === 0 ? "green" : p.tasksPending > 1 ? "red" : "yellow";
+                          return (
+                            <TableRow key={p.name}>
+                              <TableCell className="font-medium">{p.name}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{p.role}</TableCell>
+                              <TableCell className="text-sm">{p.shift}</TableCell>
+                              <TableCell className="text-sm">{p.tasksDone}</TableCell>
+                              <TableCell className="text-sm">{p.tasksPending}</TableCell>
+                              <TableCell className="text-right">
+                                <StatusBadge status={health} />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <SettingRow icon={<Settings className="size-4" />} title="SOP templates" body="Manage recurring daily task templates per shift." />
-                <SettingRow icon={<Boxes className="size-4" />} title="Stock catalog" body="Add SKUs, reorder thresholds, and expiry tracking." />
-                <SettingRow icon={<Users className="size-4" />} title="Roles & permissions" body="Staff, supervisor, and admin access levels." />
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold">Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <SettingRow icon={<Settings className="size-4" />} title="SOP templates" body="Manage recurring daily task templates per shift." />
+                    <SettingRow icon={<Boxes className="size-4" />} title="Stock catalog" body="Add SKUs, reorder thresholds, and expiry tracking." />
+                    <SettingRow icon={<Users className="size-4" />} title="Roles & permissions" body="Staff, supervisor, and admin access levels." />
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -430,11 +573,39 @@ export function CospharmDashboard() {
           Prototype · Cospharm operations dashboard · data shown is illustrative.
         </footer>
       </main>
+
+      <TaskDetailSheet
+        task={openTask}
+        audit={taskAudit}
+        role={role}
+        user={currentUser}
+        onClose={() => setOpenTaskId(null)}
+        onUpdate={updateTaskStatus}
+      />
+      <StockUpdateDialog
+        item={stockDialog}
+        role={role}
+        onClose={() => setStockDialog(null)}
+        onSubmit={updateStock}
+      />
     </div>
   );
 }
 
-function Header() {
+function Header({
+  role,
+  setRole,
+  user,
+}: {
+  role: Role;
+  setRole: (r: Role) => void;
+  user: CurrentUser;
+}) {
+  const initials = user.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
@@ -447,18 +618,28 @@ function Header() {
             <p className="text-xs text-muted-foreground leading-tight">Operations console</p>
           </div>
         </div>
-        <div className="hidden items-center gap-2 sm:flex">
+        <div className="hidden items-center gap-2 md:flex">
           <LegendDot status="green" label="Healthy / done" />
           <LegendDot status="yellow" label="Attention" />
           <LegendDot status="red" label="Critical" />
         </div>
         <div className="flex items-center gap-2">
+          <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+            <SelectTrigger className="w-[150px]" aria-label="Switch role">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin view</SelectItem>
+              <SelectItem value="supervisor">Supervisor view</SelectItem>
+              <SelectItem value="staff">Staff view</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium leading-tight">Mary Adeyemi</p>
-            <p className="text-xs text-muted-foreground leading-tight">Supervisor</p>
+            <p className="text-sm font-medium leading-tight">{user.name}</p>
+            <p className="text-xs text-muted-foreground leading-tight">{ROLE_LABEL[user.role]}</p>
           </div>
           <div className="grid size-9 place-items-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
-            MA
+            {initials}
           </div>
         </div>
       </div>
