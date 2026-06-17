@@ -92,6 +92,48 @@ export type Delivery = {
   delayReason?: string;
   resolutionNote?: string;
   responsibleDept?: string;
+  dispatchWindow?: DispatchWindow;
+  wasLate?: boolean;
+  lateDetectedAt?: string;
+  customerNotified?: boolean;
+  notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
+  resolutionPlan?: string;
+  delayReasonAt?: string;
+};
+
+export type DispatchWindow = "MORNING" | "AFTERNOON" | "EMERGENCY";
+
+export type EmergencyOrderItem = {
+  productName: string;
+  sku?: string;
+  quantity: number;
+  urgencyNote: string;
+};
+
+export type EmergencyOrderStatus =
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "ASSIGNED_TO_DRIVER"
+  | "DISPATCHED"
+  | "DELIVERED"
+  | "CANCELLED";
+
+export type EmergencyOrder = {
+  id: string;
+  deliveryId?: string;
+  orderedBy: string;
+  orderedAt: string;
+  customerName: string;
+  clientContact: string;
+  items: EmergencyOrderItem[];
+  reason: string;
+  authorisedBy?: string;
+  authorisedAt?: string;
+  status: EmergencyOrderStatus;
+  cancellationReason?: string;
+  driverAssigned?: string;
+  estimatedDelivery?: string;
+  note?: string;
 };
 
 export type CommentType =
