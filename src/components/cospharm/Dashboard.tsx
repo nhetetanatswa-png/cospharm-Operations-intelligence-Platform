@@ -181,6 +181,36 @@ const seedHandover: HandoverNote[] = [
 
 const TARGET_DELIVERIES_PER_DAY = 8;
 
+const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
+  {
+    id: "EMG-1001",
+    orderedBy: "Tebogo Motsumi",
+    orderedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    customerName: "BotswanaMed Clinic",
+    clientContact: "+267 71 234 567",
+    items: [{ productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" }],
+    reason: "Customer ran out mid-week; next scheduled dispatch is tomorrow.",
+    status: "PENDING_APPROVAL",
+  },
+  {
+    id: "EMG-1002",
+    orderedBy: "Mary Adeyemi",
+    orderedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    customerName: "Gaborone Private Hospital",
+    clientContact: "+267 39 999 100",
+    items: [
+      { productName: "Surgical Gloves Medium", quantity: 100, urgencyNote: "Theatre running low" },
+      { productName: "Paracetamol 500mg", quantity: 200, urgencyNote: "" },
+    ],
+    reason: "Theatre stock-out risk before tomorrow's window.",
+    authorisedBy: "Daniel Kgosi",
+    authorisedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    driverAssigned: "Mpho Raditlhokwa",
+    estimatedDelivery: "14:30",
+    status: "DISPATCHED",
+  },
+];
+
 // ===== Component =====
 
 export function CospharmDashboard() {
