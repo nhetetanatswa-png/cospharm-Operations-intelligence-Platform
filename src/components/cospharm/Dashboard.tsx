@@ -96,32 +96,43 @@ const INITIAL_DELIVERIES: Delivery[] = [
     id: "D-1042", customerName: "St. Mary's Clinic", assignedMarketer: "Chioma Eze", assignedOps: "John Mensah",
     dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
     requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
+    dispatchWindow: "MORNING",
   },
   {
     id: "D-1043", customerName: "Lekki Pharmacy Plus", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
     dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
     requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
+    dispatchWindow: "MORNING",
   },
   {
     id: "D-1044", customerName: "Garki Diabetes Centre", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
     dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
     requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
     delayReason: "Insulin Glargine critically low",
+    dispatchWindow: "AFTERNOON",
   },
   {
     id: "D-1045", customerName: "Aso Rock Medical", assignedMarketer: "Femi Bola", assignedOps: "Tunde Aliu",
     dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
     requiredStockIds: ["S-007"], requiredTaskIds: [],
+    dispatchWindow: "MORNING",
+    wasLate: true,
+    delayReason: "POD pending from previous delivery slowed route. Driver returned after 10:30 cutoff.",
+    responsibleDept: "Dispatch",
+    customerNotified: true,
+    notificationMethod: "CALL",
   },
   {
     id: "D-1046", customerName: "Wuse Family Clinic", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
     dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
     requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
+    dispatchWindow: "AFTERNOON",
   },
   {
     id: "D-1047", customerName: "Ikeja General Hospital", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
     dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
     requiredStockIds: ["S-004"], requiredTaskIds: [],
+    dispatchWindow: "MORNING",
   },
 ];
 
