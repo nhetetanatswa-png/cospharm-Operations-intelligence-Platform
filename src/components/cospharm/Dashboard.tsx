@@ -227,20 +227,30 @@ export function CospharmDashboard() {
   const [handovers, setHandovers] = useState<HandoverNote[]>(seedHandover);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
+  const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
+  const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
   const [openDeliveryId, setOpenDeliveryId] = useState<string | null>(null);
 
-  // ===== Late delivery auto-detection =====
+  // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
+    runLateCheck();
+    const id = setInterval(runLateCheck, 60_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function runLateCheck() {
     const now = new Date();
     setDeliveries((prev) => {
       let changed = false;
       const next = prev.map((d) => {
         if (shouldMarkLate(d, now)) {
           changed = true;
-          // side-effects (alerts/audit) queued below
+          const cutoff = DISPATCH_WINDOW_LABELS[d.dispatchWindow ?? "AFTERNOON"].sub;
           queueMicrotask(() => {
             setAlerts((al) => {
               if (al.find((a) => a.sourceId === d.id && a.title.includes("Late"))) return al;
@@ -251,7 +261,7 @@ export function CospharmDashboard() {
                   source: "delivery",
                   sourceId: d.id,
                   title: `Late delivery: ${d.id}`,
-                  body: `${d.customerName} due ${d.dueDate} not delivered before 17:00 cutoff.`,
+                  body: `${d.customerName} missed its dispatch cutoff. Delay reason required before this delivery can be progressed.`,
                   createdAt: new Date().toISOString(),
                 },
                 ...al,
@@ -268,7 +278,7 @@ export function CospharmDashboard() {
                 newValue: "LATE",
                 user: "System",
                 role: "admin",
-                comment: "Auto-marked LATE: passed 17:00 business cutoff.",
+                comment: `Auto-marked LATE after dispatch cutoff. Window: ${d.dispatchWindow ?? "AFTERNOON"} (${cutoff}).`,
                 timestamp: new Date().toISOString(),
               },
               ...au,
@@ -280,14 +290,13 @@ export function CospharmDashboard() {
               role: "admin",
             });
           });
-          return { ...d, status: "LATE" as const, delayReason: d.delayReason ?? "Not completed before 17:00 cutoff." };
+          return { ...d, status: "LATE" as const, wasLate: true, lateDetectedAt: now.toISOString() };
         }
         return d;
       });
       return changed ? next : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
 
   function pushActivity(e: Omit<ActivityEvent, "id" | "timestamp">) {
     setActivity((prev) => [
