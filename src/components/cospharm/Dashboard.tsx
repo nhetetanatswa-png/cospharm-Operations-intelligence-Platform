@@ -570,6 +570,12 @@ export function CospharmDashboard() {
               <CriticalActionsQueue items={criticalActions} onOpenTask={setOpenTaskId} onOpenDelivery={setOpenDeliveryId} onOpenStock={(id) => { const s = stock.find((x) => x.id === id); if (s) setStockDialog(s); }} />
             </div>
 
+            <DispatchWindowsPanel
+              deliveries={deliveries}
+              emergencyOrders={emergencyOrders}
+              onOpenEmergency={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+            />
+
             <div className="grid gap-6 lg:grid-cols-3">
               <LiveActivityFeed events={activity} />
               <StockRiskSummary items={stock} />
