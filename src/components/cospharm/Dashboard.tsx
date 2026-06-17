@@ -888,6 +888,11 @@ export function CospharmDashboard() {
         onHideComment={hideComment}
         onResolveLate={resolveLateDelivery}
       />
+      <DelayReasonDialog
+        delivery={delayDialog}
+        onClose={() => setDelayDialog(null)}
+        onSave={(payload) => delayDialog && saveDelayReason(delayDialog, payload)}
+      />
     </div>
   );
 }
