@@ -562,7 +562,7 @@ export function CospharmDashboard() {
               <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`} sub="Target progress" tone="green" />
               <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pendingDeliveries} sub="Awaiting completion" tone="yellow" />
               <KpiCard icon={<AlertTriangle className="size-5" />} label="At risk / Blocked" value={atRiskDeliveries + blockedDeliveries} sub="Need supervisor action" tone="yellow" />
-              <KpiCard icon={<ShieldCheck className="size-5" />} label="Late deliveries" value={lateDeliveries} sub="Past 17:00 cutoff" tone="red" />
+              <KpiCard icon={<ShieldCheck className="size-5" />} label="Late deliveries" value={lateDeliveries} sub="Past dispatch cutoff" tone="red" />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
