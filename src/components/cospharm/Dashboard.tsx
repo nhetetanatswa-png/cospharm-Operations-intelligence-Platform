@@ -33,6 +33,9 @@ import { AuditTrailCard } from "./AuditTrailCard";
 import { DeliveryDetailSheet } from "./DeliveryDetailSheet";
 import { DeliveryProgress } from "./DeliveryProgress";
 import { CommentsBox } from "./CommentsBox";
+import { DispatchWindowsPanel } from "./DispatchWindowsPanel";
+import { DelayReasonDialog } from "./DelayReasonDialog";
+import { EmergencyOrders } from "./EmergencyOrders";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import {
   deliveryStatusBadge,
@@ -42,6 +45,7 @@ import {
   getProgressPercentage,
   getCurrentStep,
   getCompletedSteps,
+  DISPATCH_WINDOW_LABELS,
 } from "./operations";
 import type {
   ActivityEvent,
@@ -51,6 +55,8 @@ import type {
   CommentType,
   CurrentUser,
   Delivery,
+  EmergencyOrder,
+  EmergencyOrderStatus,
   HandoverNote,
   Role,
   StockItem,
@@ -90,32 +96,43 @@ const INITIAL_DELIVERIES: Delivery[] = [
     id: "D-1042", customerName: "St. Mary's Clinic", assignedMarketer: "Chioma Eze", assignedOps: "John Mensah",
     dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
     requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
+    dispatchWindow: "MORNING",
   },
   {
     id: "D-1043", customerName: "Lekki Pharmacy Plus", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
     dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
     requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
+    dispatchWindow: "MORNING",
   },
   {
     id: "D-1044", customerName: "Garki Diabetes Centre", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
     dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
     requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
     delayReason: "Insulin Glargine critically low",
+    dispatchWindow: "AFTERNOON",
   },
   {
     id: "D-1045", customerName: "Aso Rock Medical", assignedMarketer: "Femi Bola", assignedOps: "Tunde Aliu",
     dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
     requiredStockIds: ["S-007"], requiredTaskIds: [],
+    dispatchWindow: "MORNING",
+    wasLate: true,
+    delayReason: "POD pending from previous delivery slowed route. Driver returned after 10:30 cutoff.",
+    responsibleDept: "Dispatch",
+    customerNotified: true,
+    notificationMethod: "CALL",
   },
   {
     id: "D-1046", customerName: "Wuse Family Clinic", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
     dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
     requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
+    dispatchWindow: "AFTERNOON",
   },
   {
     id: "D-1047", customerName: "Ikeja General Hospital", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
     dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
     requiredStockIds: ["S-004"], requiredTaskIds: [],
+    dispatchWindow: "MORNING",
   },
 ];
 
@@ -164,6 +181,36 @@ const seedHandover: HandoverNote[] = [
 
 const TARGET_DELIVERIES_PER_DAY = 8;
 
+const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
+  {
+    id: "EMG-1001",
+    orderedBy: "Tebogo Motsumi",
+    orderedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    customerName: "BotswanaMed Clinic",
+    clientContact: "+267 71 234 567",
+    items: [{ productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" }],
+    reason: "Customer ran out mid-week; next scheduled dispatch is tomorrow.",
+    status: "PENDING_APPROVAL",
+  },
+  {
+    id: "EMG-1002",
+    orderedBy: "Mary Adeyemi",
+    orderedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    customerName: "Gaborone Private Hospital",
+    clientContact: "+267 39 999 100",
+    items: [
+      { productName: "Surgical Gloves Medium", quantity: 100, urgencyNote: "Theatre running low" },
+      { productName: "Paracetamol 500mg", quantity: 200, urgencyNote: "" },
+    ],
+    reason: "Theatre stock-out risk before tomorrow's window.",
+    authorisedBy: "Daniel Kgosi",
+    authorisedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    driverAssigned: "Mpho Raditlhokwa",
+    estimatedDelivery: "14:30",
+    status: "DISPATCHED",
+  },
+];
+
 // ===== Component =====
 
 export function CospharmDashboard() {
@@ -180,20 +227,30 @@ export function CospharmDashboard() {
   const [handovers, setHandovers] = useState<HandoverNote[]>(seedHandover);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
+  const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
+  const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
   const [openDeliveryId, setOpenDeliveryId] = useState<string | null>(null);
 
-  // ===== Late delivery auto-detection =====
+  // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
+    runLateCheck();
+    const id = setInterval(runLateCheck, 60_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function runLateCheck() {
     const now = new Date();
     setDeliveries((prev) => {
       let changed = false;
       const next = prev.map((d) => {
         if (shouldMarkLate(d, now)) {
           changed = true;
-          // side-effects (alerts/audit) queued below
+          const cutoff = DISPATCH_WINDOW_LABELS[d.dispatchWindow ?? "AFTERNOON"].sub;
           queueMicrotask(() => {
             setAlerts((al) => {
               if (al.find((a) => a.sourceId === d.id && a.title.includes("Late"))) return al;
@@ -204,7 +261,7 @@ export function CospharmDashboard() {
                   source: "delivery",
                   sourceId: d.id,
                   title: `Late delivery: ${d.id}`,
-                  body: `${d.customerName} due ${d.dueDate} not delivered before 17:00 cutoff.`,
+                  body: `${d.customerName} missed its dispatch cutoff. Delay reason required before this delivery can be progressed.`,
                   createdAt: new Date().toISOString(),
                 },
                 ...al,
@@ -221,7 +278,7 @@ export function CospharmDashboard() {
                 newValue: "LATE",
                 user: "System",
                 role: "admin",
-                comment: "Auto-marked LATE: passed 17:00 business cutoff.",
+                comment: `Auto-marked LATE after dispatch cutoff. Window: ${d.dispatchWindow ?? "AFTERNOON"} (${cutoff}).`,
                 timestamp: new Date().toISOString(),
               },
               ...au,
@@ -233,14 +290,13 @@ export function CospharmDashboard() {
               role: "admin",
             });
           });
-          return { ...d, status: "LATE" as const, delayReason: d.delayReason ?? "Not completed before 17:00 cutoff." };
+          return { ...d, status: "LATE" as const, wasLate: true, lateDetectedAt: now.toISOString() };
         }
         return d;
       });
       return changed ? next : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
 
   function pushActivity(e: Omit<ActivityEvent, "id" | "timestamp">) {
     setActivity((prev) => [
@@ -335,6 +391,68 @@ export function CospharmDashboard() {
     setAlerts((prev) => prev.map((a) => (a.sourceId === d.id ? { ...a, resolved: true, resolutionComment: reason } : a)));
     logAudit({ entityType: "task", entityId: d.id, entityLabel: `Delivery ${d.customerName}`, field: "status", oldValue: "LATE", newValue: "DELIVERED", comment: `Resolved: ${reason}` });
     pushActivity({ kind: "alert", message: `Late delivery ${d.id} resolved`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function saveDelayReason(d: Delivery, payload: {
+    delayReason: string;
+    responsibleDept: string;
+    customerNotified: "YES" | "NO" | "PENDING";
+    notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
+    resolutionPlan: string;
+  }) {
+    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? {
+      ...x,
+      delayReason: payload.delayReason,
+      responsibleDept: payload.responsibleDept,
+      customerNotified: payload.customerNotified === "YES",
+      notificationMethod: payload.notificationMethod,
+      resolutionPlan: payload.resolutionPlan,
+      delayReasonAt: new Date().toISOString(),
+    } : x)));
+    logAudit({ entityType: "task", entityId: d.id, entityLabel: `Delivery ${d.customerName}`, field: "issue", oldValue: "—", newValue: "delay reason recorded", comment: `Delay reason for LATE ${d.id}: ${payload.delayReason} (responsible: ${payload.responsibleDept})` });
+    pushActivity({ kind: "delivery", message: `Delay reason recorded for ${d.id}`, actor: currentUser.name, role: currentUser.role });
+    setDelayDialog(null);
+  }
+
+  function createEmergencyOrder(o: Omit<EmergencyOrder, "id" | "orderedBy" | "orderedAt" | "status">) {
+    const id = `EMG-${1000 + emergencyOrders.length + 1}`;
+    const next: EmergencyOrder = {
+      ...o,
+      id,
+      orderedBy: currentUser.name,
+      orderedAt: new Date().toISOString(),
+      status: "PENDING_APPROVAL",
+    };
+    setEmergencyOrders((prev) => [next, ...prev]);
+    setAlerts((prev) => [{
+      id: `AL-EMG-${id}`,
+      severity: "yellow",
+      source: "delivery",
+      sourceId: id,
+      title: `Emergency order raised: ${id}`,
+      body: `${next.customerName} — awaiting supervisor approval.`,
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${next.customerName}`, field: "status", oldValue: "—", newValue: "PENDING_APPROVAL", comment: next.reason });
+    pushActivity({ kind: "delivery", message: `Emergency order ${id} raised for ${next.customerName}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function updateEmergencyStatus(id: string, status: EmergencyOrderStatus, note?: string) {
+    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? {
+      ...o,
+      status,
+      authorisedBy: status === "APPROVED" || status === "CANCELLED" ? currentUser.name : o.authorisedBy,
+      authorisedAt: status === "APPROVED" || status === "CANCELLED" ? new Date().toISOString() : o.authorisedAt,
+      cancellationReason: status === "CANCELLED" ? note : o.cancellationReason,
+    } : o));
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "—", newValue: status, comment: note ?? `Status changed to ${status}` });
+    pushActivity({ kind: "delivery", message: `Emergency order ${id} → ${status}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function assignEmergencyDriver(id: string, driver: string, eta: string) {
+    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? { ...o, driverAssigned: driver, estimatedDelivery: eta, status: "ASSIGNED_TO_DRIVER" } : o));
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "APPROVED", newValue: "ASSIGNED_TO_DRIVER", comment: `Driver ${driver}, ETA ${eta}` });
+    pushActivity({ kind: "delivery", message: `Emergency ${id} assigned to ${driver}`, actor: currentUser.name, role: currentUser.role });
   }
 
   function addHandover(message: string, shiftTo: HandoverNote["shiftTo"]) {
@@ -444,13 +562,19 @@ export function CospharmDashboard() {
               <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`} sub="Target progress" tone="green" />
               <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pendingDeliveries} sub="Awaiting completion" tone="yellow" />
               <KpiCard icon={<AlertTriangle className="size-5" />} label="At risk / Blocked" value={atRiskDeliveries + blockedDeliveries} sub="Need supervisor action" tone="yellow" />
-              <KpiCard icon={<ShieldCheck className="size-5" />} label="Late deliveries" value={lateDeliveries} sub="Past 17:00 cutoff" tone="red" />
+              <KpiCard icon={<ShieldCheck className="size-5" />} label="Late deliveries" value={lateDeliveries} sub="Past dispatch cutoff" tone="red" />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
               <DeliveryRiskPanel items={deliveriesWithRisk} onOpen={setOpenDeliveryId} />
               <CriticalActionsQueue items={criticalActions} onOpenTask={setOpenTaskId} onOpenDelivery={setOpenDeliveryId} onOpenStock={(id) => { const s = stock.find((x) => x.id === id); if (s) setStockDialog(s); }} />
             </div>
+
+            <DispatchWindowsPanel
+              deliveries={deliveries}
+              emergencyOrders={emergencyOrders}
+              onOpenEmergency={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+            />
 
             <div className="grid gap-6 lg:grid-cols-3">
               <LiveActivityFeed events={activity} />
@@ -482,6 +606,19 @@ export function CospharmDashboard() {
 
           {/* ============ DELIVERIES ============ */}
           <TabsContent value="deliveries" className="space-y-4">
+            <Tabs value={deliveriesTab} onValueChange={(v) => setDeliveriesTab(v as "active" | "emergency")}>
+              <TabsList>
+                <TabsTrigger value="active">All deliveries</TabsTrigger>
+                <TabsTrigger value="emergency" className="gap-1.5">
+                  🚨 Emergency orders
+                  {emergencyOrders.filter((o) => o.status === "PENDING_APPROVAL").length > 0 ? (
+                    <span className="ml-1 rounded-full bg-status-red px-1.5 text-[10px] font-semibold text-white">
+                      {emergencyOrders.filter((o) => o.status === "PENDING_APPROVAL").length}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="active" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base font-semibold">Active deliveries · 7-step workflow</CardTitle>
@@ -492,33 +629,60 @@ export function CospharmDashboard() {
               <CardContent className="space-y-3">
                 {deliveriesWithRisk.map(({ d, risk }) => {
                   const badge = deliveryStatusBadge(d.status);
+                  const w = d.dispatchWindow ?? "AFTERNOON";
+                  const winInfo = DISPATCH_WINDOW_LABELS[w];
+                  const isLate = d.status === "LATE";
+                  const needsDelayReason = isLate && !d.delayReason;
                   return (
-                    <button
+                    <div
                       key={d.id}
-                      onClick={() => setOpenDeliveryId(d.id)}
-                      className="block w-full rounded-md border bg-card p-4 text-left transition hover:bg-secondary/40"
+                      className={`rounded-md border bg-card p-4 transition ${needsDelayReason ? "border-status-red animate-pulse" : isLate ? "border-status-red" : ""}`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
+                        <button onClick={() => setOpenDeliveryId(d.id)} className="text-left">
                           <p className="font-mono text-xs text-muted-foreground">{d.id} · due {d.dueDate}</p>
                           <p className="font-medium">{d.customerName}</p>
                           <p className="text-xs text-muted-foreground">
                             Marketer {d.assignedMarketer} · Ops {d.assignedOps}
                           </p>
-                        </div>
+                        </button>
                         <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${winInfo.badge}`}>
+                            {winInfo.emoji} {winInfo.label}
+                          </span>
                           {risk.risk !== "READY" ? <StatusBadge status={risk.risk === "BLOCKED" ? "red" : "yellow"} label={risk.risk === "BLOCKED" ? "Blocked" : "At risk"} /> : null}
                           <StatusBadge status={badge.tone} label={badge.label} />
+                          {needsDelayReason ? (
+                            <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setDelayDialog(d); }}>
+                              Add delay reason
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                       <div className="mt-3">
                         <DeliveryProgress steps={d.steps} />
                       </div>
-                    </button>
+                      {isLate && d.delayReason ? (
+                        <p className="mt-2 rounded bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
+                          Delay reason on record · {d.responsibleDept ?? ""} · {d.delayReason}
+                        </p>
+                      ) : null}
+                    </div>
                   );
                 })}
               </CardContent>
             </Card>
+              </TabsContent>
+              <TabsContent value="emergency" className="mt-4">
+                <EmergencyOrders
+                  orders={emergencyOrders}
+                  user={currentUser}
+                  onCreate={createEmergencyOrder}
+                  onUpdateStatus={updateEmergencyStatus}
+                  onAssignDriver={assignEmergencyDriver}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* ============ TASKS ============ */}
@@ -723,6 +887,11 @@ export function CospharmDashboard() {
         onAddComment={(id, t, m) => addComment(id, t, m, "DELIVERY")}
         onHideComment={hideComment}
         onResolveLate={resolveLateDelivery}
+      />
+      <DelayReasonDialog
+        delivery={delayDialog}
+        onClose={() => setDelayDialog(null)}
+        onSave={(payload) => delayDialog && saveDelayReason(delayDialog, payload)}
       />
     </div>
   );
