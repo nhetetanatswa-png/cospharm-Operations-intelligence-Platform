@@ -393,6 +393,68 @@ export function CospharmDashboard() {
     pushActivity({ kind: "alert", message: `Late delivery ${d.id} resolved`, actor: currentUser.name, role: currentUser.role });
   }
 
+  function saveDelayReason(d: Delivery, payload: {
+    delayReason: string;
+    responsibleDept: string;
+    customerNotified: "YES" | "NO" | "PENDING";
+    notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
+    resolutionPlan: string;
+  }) {
+    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? {
+      ...x,
+      delayReason: payload.delayReason,
+      responsibleDept: payload.responsibleDept,
+      customerNotified: payload.customerNotified === "YES",
+      notificationMethod: payload.notificationMethod,
+      resolutionPlan: payload.resolutionPlan,
+      delayReasonAt: new Date().toISOString(),
+    } : x)));
+    logAudit({ entityType: "task", entityId: d.id, entityLabel: `Delivery ${d.customerName}`, field: "issue", oldValue: "—", newValue: "delay reason recorded", comment: `Delay reason for LATE ${d.id}: ${payload.delayReason} (responsible: ${payload.responsibleDept})` });
+    pushActivity({ kind: "delivery", message: `Delay reason recorded for ${d.id}`, actor: currentUser.name, role: currentUser.role });
+    setDelayDialog(null);
+  }
+
+  function createEmergencyOrder(o: Omit<EmergencyOrder, "id" | "orderedBy" | "orderedAt" | "status">) {
+    const id = `EMG-${1000 + emergencyOrders.length + 1}`;
+    const next: EmergencyOrder = {
+      ...o,
+      id,
+      orderedBy: currentUser.name,
+      orderedAt: new Date().toISOString(),
+      status: "PENDING_APPROVAL",
+    };
+    setEmergencyOrders((prev) => [next, ...prev]);
+    setAlerts((prev) => [{
+      id: `AL-EMG-${id}`,
+      severity: "yellow",
+      source: "delivery",
+      sourceId: id,
+      title: `Emergency order raised: ${id}`,
+      body: `${next.customerName} — awaiting supervisor approval.`,
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${next.customerName}`, field: "status", oldValue: "—", newValue: "PENDING_APPROVAL", comment: next.reason });
+    pushActivity({ kind: "delivery", message: `Emergency order ${id} raised for ${next.customerName}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function updateEmergencyStatus(id: string, status: EmergencyOrderStatus, note?: string) {
+    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? {
+      ...o,
+      status,
+      authorisedBy: status === "APPROVED" || status === "CANCELLED" ? currentUser.name : o.authorisedBy,
+      authorisedAt: status === "APPROVED" || status === "CANCELLED" ? new Date().toISOString() : o.authorisedAt,
+      cancellationReason: status === "CANCELLED" ? note : o.cancellationReason,
+    } : o));
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "—", newValue: status, comment: note ?? `Status changed to ${status}` });
+    pushActivity({ kind: "delivery", message: `Emergency order ${id} → ${status}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function assignEmergencyDriver(id: string, driver: string, eta: string) {
+    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? { ...o, driverAssigned: driver, estimatedDelivery: eta, status: "ASSIGNED_TO_DRIVER" } : o));
+    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "APPROVED", newValue: "ASSIGNED_TO_DRIVER", comment: `Driver ${driver}, ETA ${eta}` });
+    pushActivity({ kind: "delivery", message: `Emergency ${id} assigned to ${driver}`, actor: currentUser.name, role: currentUser.role });
+  }
+
   function addHandover(message: string, shiftTo: HandoverNote["shiftTo"]) {
     setHandovers((prev) => [
       { id: `H-${prev.length + 1}`, shiftFrom: "Morning", shiftTo, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() },
