@@ -1,4 +1,4 @@
-import type { Delivery, DeliveryStatus, OperationStep, Role, StockItem, Task } from "./types";
+import type { Delivery, DeliveryStatus, DispatchWindow, OperationStep, Role, StockItem, Task } from "./types";
 import type { Status } from "./StatusBadge";
 
 export const OPERATION_STEPS: OperationStep[] = [
@@ -76,16 +76,42 @@ export function completeStep(
   );
 }
 
-// ===== Late delivery logic =====
+// ===== Dispatch windows + late delivery logic =====
 
-export function hasPassedBusinessCutoff(dueDate: string, now: Date = new Date(), cutoffHour = 17) {
-  const cutoff = new Date(dueDate);
-  cutoff.setHours(cutoffHour, 0, 0, 0);
-  return now > cutoff;
+export const DISPATCH_WINDOW_CUTOFFS: Record<DispatchWindow, string> = {
+  MORNING: "10:30",
+  AFTERNOON: "15:30",
+  EMERGENCY: "23:59",
+};
+
+export const DISPATCH_WINDOW_LABELS: Record<DispatchWindow, { label: string; sub: string; emoji: string; badge: string }> = {
+  MORNING: { label: "Morning", sub: "Ready by 07:30 · cutoff 10:30", emoji: "🌅", badge: "bg-blue-100 text-blue-800 border-blue-200" },
+  AFTERNOON: { label: "Afternoon", sub: "Ready by 12:30 · cutoff 15:30", emoji: "🌇", badge: "bg-orange-100 text-orange-800 border-orange-200" },
+  EMERGENCY: { label: "Emergency", sub: "Urgent — see emergency order", emoji: "🚨", badge: "bg-red-100 text-red-800 border-red-200 animate-pulse" },
+};
+
+export function getWindowCutoffDate(dueDate: string, window: DispatchWindow): Date {
+  const [h, m] = DISPATCH_WINDOW_CUTOFFS[window].split(":").map(Number);
+  const d = new Date(dueDate + "T00:00:00");
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
 export function shouldMarkLate(d: Delivery, now: Date = new Date()): boolean {
-  return d.status !== "DELIVERED" && d.status !== "LATE" && hasPassedBusinessCutoff(d.dueDate, now);
+  if (d.status === "DELIVERED" || d.status === "DISPATCHED" || d.status === "LATE") return false;
+  const cutoff = getWindowCutoffDate(d.dueDate, d.dispatchWindow ?? "AFTERNOON");
+  return now > cutoff;
+}
+
+export function getWindowState(window: DispatchWindow, now: Date = new Date()): "UPCOMING" | "OPEN" | "CLOSED" {
+  if (window === "EMERGENCY") return "OPEN";
+  const today = now.toISOString().slice(0, 10);
+  const cutoff = getWindowCutoffDate(today, window);
+  const open = getWindowCutoffDate(today, window);
+  open.setHours(window === "MORNING" ? 8 : 13, 0, 0, 0);
+  if (now < open) return "UPCOMING";
+  if (now > cutoff) return "CLOSED";
+  return "OPEN";
 }
 
 // ===== Risk derivation =====
