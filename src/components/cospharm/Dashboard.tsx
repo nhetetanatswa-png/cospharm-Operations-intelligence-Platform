@@ -5,6 +5,7 @@ import {
   Boxes,
   ClipboardList,
   Clock,
+  CalendarDays,
   History,
   LayoutDashboard,
   Lock,
@@ -176,13 +177,33 @@ const seedAudit = (): AuditEntry[] => [
   },
 ];
 
-const seedHandover: HandoverNote[] = [
-  {
-    id: "H-001", shiftFrom: "Night", shiftTo: "Morning",
-    authorName: "Mary Adeyemi", authorRole: "supervisor",
-    message: "Overnight delivery manifest unsigned — escalate at handover. Insulin Glargine restock arriving 10am.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-  },
+const SEED_PROMO_STOCK: PromoStockItem[] = [
+  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12", notes: [
+    { id: "PN-1", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  ]},
+  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120, notes: [] },
+  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08", notes: [] },
+];
+
+const SEED_VISITS: FieldVisit[] = [
+  { id: "FV-1", title: "St. Mary's quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Chioma Eze", customer: "St. Mary's Clinic", location: "Lagos", notes: "Bring Q3 sales report", status: "PLANNED" },
+  { id: "FV-2", title: "OSC — Wuse Family Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Chioma Eze", customer: "Wuse Family Clinic", status: "PLANNED" },
+];
+
+const SEED_FIELD_LOG: FieldLogEntry[] = [
+  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Chioma Eze", customer: "Lekki Pharmacy Plus", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Interested in expanded antibiotics range.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+];
+
+const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
+  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Chioma Eze", requestedByRole: "marketer", customer: "St. Mary's Clinic", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
+];
+
+const SEED_CALENDAR: CalendarEvent[] = [
+  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Mary Adeyemi", description: "Full warehouse count", important: true },
+  { id: "CE-2", title: "Internal audit", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Olu Adebayo", important: true },
+  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Chioma Eze", location: "Gaborone Mall" },
+  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Thato Moremi" },
+  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Admin", important: true },
 ];
 
 const TARGET_DELIVERIES_PER_DAY = 8;
