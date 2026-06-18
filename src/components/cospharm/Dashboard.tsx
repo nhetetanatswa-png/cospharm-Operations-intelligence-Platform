@@ -36,6 +36,8 @@ import { CommentsBox } from "./CommentsBox";
 import { DispatchWindowsPanel } from "./DispatchWindowsPanel";
 import { DelayReasonDialog } from "./DelayReasonDialog";
 import { EmergencyOrders } from "./EmergencyOrders";
+import { MarketerModule } from "./MarketerModule";
+import { OperationsCalendar } from "./OperationsCalendar";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import {
   deliveryStatusBadge,
@@ -51,13 +53,17 @@ import type {
   ActivityEvent,
   Alert,
   AuditEntry,
+  AuthorisationRequest,
+  CalendarEvent,
   Comment,
   CommentType,
   CurrentUser,
   Delivery,
   EmergencyOrder,
   EmergencyOrderStatus,
-  HandoverNote,
+  FieldLogEntry,
+  FieldVisit,
+  PromoStockItem,
   Role,
   StockItem,
   Task,
