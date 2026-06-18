@@ -251,7 +251,11 @@ export function CospharmDashboard() {
   const [audit, setAudit] = useState<AuditEntry[]>(seedAudit);
   const [deliveries, setDeliveries] = useState<Delivery[]>(INITIAL_DELIVERIES);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [handovers, setHandovers] = useState<HandoverNote[]>(seedHandover);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(SEED_CALENDAR);
+  const [promoStock, setPromoStock] = useState<PromoStockItem[]>(SEED_PROMO_STOCK);
+  const [visits, setVisits] = useState<FieldVisit[]>(SEED_VISITS);
+  const [fieldLog, setFieldLog] = useState<FieldLogEntry[]>(SEED_FIELD_LOG);
+  const [authRequests, setAuthRequests] = useState<AuthorisationRequest[]>(SEED_AUTH_REQUESTS);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
@@ -482,12 +486,60 @@ export function CospharmDashboard() {
     pushActivity({ kind: "delivery", message: `Emergency ${id} assigned to ${driver}`, actor: currentUser.name, role: currentUser.role });
   }
 
-  function addHandover(message: string, shiftTo: HandoverNote["shiftTo"]) {
-    setHandovers((prev) => [
-      { id: `H-${prev.length + 1}`, shiftFrom: "Morning", shiftTo, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
-    pushActivity({ kind: "handover", message: `Handover note for ${shiftTo} shift`, actor: currentUser.name, role: currentUser.role });
+  function addCalendarEvent(e: Omit<CalendarEvent, "id">) {
+    const id = `CE-${calendarEvents.length + 100}`;
+    setCalendarEvents((prev) => [{ ...e, id }, ...prev]);
+    pushActivity({ kind: "delivery", message: `Calendar event added: ${e.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function addPromoNote(promoId: string, message: string) {
+    setPromoStock((prev) => prev.map((p) => p.id === promoId ? {
+      ...p,
+      notes: [...p.notes, { id: `PN-${Date.now()}`, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() }],
+    } : p));
+    pushActivity({ kind: "comment", message: `Promo note added`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function addVisit(v: Omit<FieldVisit, "id">) {
+    setVisits((prev) => [...prev, { ...v, id: `FV-${prev.length + 100}` }]);
+    pushActivity({ kind: "delivery", message: `Visit scheduled: ${v.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function updateVisit(id: string, patch: Partial<FieldVisit>) {
+    setVisits((prev) => prev.map((v) => v.id === id ? { ...v, ...patch } : v));
+  }
+
+  function addFieldLog(e: Omit<FieldLogEntry, "id" | "createdAt">) {
+    const entry: FieldLogEntry = { ...e, id: `FL-${fieldLog.length + 100}`, createdAt: new Date().toISOString() };
+    setFieldLog((prev) => [entry, ...prev]);
+    // Auto-deduct promo stock
+    if (e.productsUsed.length) {
+      setPromoStock((prev) => prev.map((p) => {
+        const used = e.productsUsed.find((u) => u.promoStockId === p.id);
+        return used ? { ...p, onHand: Math.max(0, p.onHand - used.quantity) } : p;
+      }));
+    }
+    pushActivity({ kind: "delivery", message: `Field log added for ${e.customer}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function createAuthRequest(r: Omit<AuthorisationRequest, "id" | "createdAt" | "status" | "requestedBy" | "requestedByRole">) {
+    const req: AuthorisationRequest = {
+      ...r,
+      id: `AR-${String(authRequests.length + 100).padStart(3, "0")}`,
+      createdAt: new Date().toISOString(),
+      status: "PENDING",
+      requestedBy: currentUser.name,
+      requestedByRole: currentUser.role,
+    };
+    setAuthRequests((prev) => [req, ...prev]);
+    pushActivity({ kind: "alert", message: `Authorisation request ${req.id} raised`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function decideAuthRequest(id: string, decision: "APPROVED" | "REJECTED", note: string) {
+    setAuthRequests((prev) => prev.map((r) => r.id === id ? {
+      ...r, status: decision, decidedBy: currentUser.name, decidedAt: new Date().toISOString(), decisionNote: note,
+    } : r));
+    pushActivity({ kind: "alert", message: `Request ${id} ${decision.toLowerCase()}`, actor: currentUser.name, role: currentUser.role });
   }
 
   // ===== Derived =====
