@@ -1261,3 +1261,38 @@ function SummaryRow({ label, count, tone }: { label: string; count: number; tone
   );
 }
 
+function UpcomingEventsCard({ events, onSeeAll }: { events: CalendarEvent[]; onSeeAll: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = [...events]
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 5);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <CalendarDays className="size-4" /> Upcoming events
+        </CardTitle>
+        <Button size="sm" variant="ghost" onClick={onSeeAll}>See all</Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {upcoming.length === 0 ? (
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">No upcoming events.</p>
+        ) : (
+          upcoming.map((e) => (
+            <div key={e.id} className="rounded-md border p-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium truncate">{e.important ? "★ " : ""}{e.title}</p>
+                <span className="text-[10px] uppercase text-muted-foreground">{e.type}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {new Date(e.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+                {e.time ? ` · ${e.time}` : ""}{e.owner ? ` · ${e.owner}` : ""}
+              </p>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
