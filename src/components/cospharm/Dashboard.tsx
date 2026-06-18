@@ -628,7 +628,7 @@ export function CospharmDashboard() {
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer"}>
               <Megaphone className="size-4" /> Marketer
             </TabsTrigger>
-            <TabsTrigger value="handover" className="gap-1.5"><History className="size-4" /> Handover</TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
             <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
               <UserCog className="size-4" /> Admin
@@ -658,7 +658,7 @@ export function CospharmDashboard() {
             <div className="grid gap-6 lg:grid-cols-3">
               <LiveActivityFeed events={activity} />
               <StockRiskSummary items={stock} />
-              <HandoverNotesCard notes={handovers} canCreate={can(role, "handover.create")} onCreate={addHandover} />
+              <UpcomingEventsCard events={calendarEvents} onSeeAll={() => setTab("calendar")} />
             </div>
 
             {tasks.some((t) => t.pendingVerification) && can(role, "task.verify") ? (
@@ -870,18 +870,32 @@ export function CospharmDashboard() {
 
           {/* ============ MARKETER ============ */}
           <TabsContent value="marketer" className="space-y-6">
-            <MarketerDashboard
+            <MarketerModule
               user={currentUser}
               deliveries={deliveries}
               comments={comments}
+              promoStock={promoStock}
+              visits={visits}
+              fieldLog={fieldLog}
+              authRequests={authRequests}
               onOpenDelivery={setOpenDeliveryId}
-              onAddComment={(id, type, msg) => addComment(id, type, msg, "DELIVERY")}
+              onAddPromoNote={addPromoNote}
+              onAddVisit={addVisit}
+              onUpdateVisit={updateVisit}
+              onAddFieldLog={addFieldLog}
+              onCreateAuthRequest={createAuthRequest}
+              onDecideAuthRequest={decideAuthRequest}
             />
           </TabsContent>
 
-          {/* ============ HANDOVER ============ */}
-          <TabsContent value="handover" className="space-y-4">
-            <HandoverNotesCard notes={handovers} canCreate={can(role, "handover.create")} onCreate={addHandover} full />
+          {/* ============ CALENDAR ============ */}
+          <TabsContent value="calendar" className="space-y-4">
+            <OperationsCalendar
+              events={calendarEvents}
+              user={currentUser}
+              canCreate={["admin", "supervisor", "dispatch_supervisor", "marketer"].includes(role)}
+              onAdd={addCalendarEvent}
+            />
           </TabsContent>
 
           {/* ============ AUDIT ============ */}
