@@ -5,6 +5,7 @@ import {
   Boxes,
   ClipboardList,
   Clock,
+  CalendarDays,
   History,
   LayoutDashboard,
   Lock,
@@ -36,6 +37,8 @@ import { CommentsBox } from "./CommentsBox";
 import { DispatchWindowsPanel } from "./DispatchWindowsPanel";
 import { DelayReasonDialog } from "./DelayReasonDialog";
 import { EmergencyOrders } from "./EmergencyOrders";
+import { MarketerModule } from "./MarketerModule";
+import { OperationsCalendar } from "./OperationsCalendar";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import {
   deliveryStatusBadge,
@@ -51,13 +54,17 @@ import type {
   ActivityEvent,
   Alert,
   AuditEntry,
+  AuthorisationRequest,
+  CalendarEvent,
   Comment,
   CommentType,
   CurrentUser,
   Delivery,
   EmergencyOrder,
   EmergencyOrderStatus,
-  HandoverNote,
+  FieldLogEntry,
+  FieldVisit,
+  PromoStockItem,
   Role,
   StockItem,
   Task,
@@ -170,13 +177,33 @@ const seedAudit = (): AuditEntry[] => [
   },
 ];
 
-const seedHandover: HandoverNote[] = [
-  {
-    id: "H-001", shiftFrom: "Night", shiftTo: "Morning",
-    authorName: "Mary Adeyemi", authorRole: "supervisor",
-    message: "Overnight delivery manifest unsigned — escalate at handover. Insulin Glargine restock arriving 10am.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-  },
+const SEED_PROMO_STOCK: PromoStockItem[] = [
+  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12", notes: [
+    { id: "PN-1", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  ]},
+  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120, notes: [] },
+  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08", notes: [] },
+];
+
+const SEED_VISITS: FieldVisit[] = [
+  { id: "FV-1", title: "St. Mary's quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Chioma Eze", customer: "St. Mary's Clinic", location: "Lagos", notes: "Bring Q3 sales report", status: "PLANNED" },
+  { id: "FV-2", title: "OSC — Wuse Family Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Chioma Eze", customer: "Wuse Family Clinic", status: "PLANNED" },
+];
+
+const SEED_FIELD_LOG: FieldLogEntry[] = [
+  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Chioma Eze", customer: "Lekki Pharmacy Plus", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Interested in expanded antibiotics range.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+];
+
+const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
+  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Chioma Eze", requestedByRole: "marketer", customer: "St. Mary's Clinic", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
+];
+
+const SEED_CALENDAR: CalendarEvent[] = [
+  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Mary Adeyemi", description: "Full warehouse count", important: true },
+  { id: "CE-2", title: "Internal audit", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Olu Adebayo", important: true },
+  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Chioma Eze", location: "Gaborone Mall" },
+  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Thato Moremi" },
+  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Admin", important: true },
 ];
 
 const TARGET_DELIVERIES_PER_DAY = 8;
@@ -224,7 +251,11 @@ export function CospharmDashboard() {
   const [audit, setAudit] = useState<AuditEntry[]>(seedAudit);
   const [deliveries, setDeliveries] = useState<Delivery[]>(INITIAL_DELIVERIES);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [handovers, setHandovers] = useState<HandoverNote[]>(seedHandover);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(SEED_CALENDAR);
+  const [promoStock, setPromoStock] = useState<PromoStockItem[]>(SEED_PROMO_STOCK);
+  const [visits, setVisits] = useState<FieldVisit[]>(SEED_VISITS);
+  const [fieldLog, setFieldLog] = useState<FieldLogEntry[]>(SEED_FIELD_LOG);
+  const [authRequests, setAuthRequests] = useState<AuthorisationRequest[]>(SEED_AUTH_REQUESTS);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
@@ -455,12 +486,60 @@ export function CospharmDashboard() {
     pushActivity({ kind: "delivery", message: `Emergency ${id} assigned to ${driver}`, actor: currentUser.name, role: currentUser.role });
   }
 
-  function addHandover(message: string, shiftTo: HandoverNote["shiftTo"]) {
-    setHandovers((prev) => [
-      { id: `H-${prev.length + 1}`, shiftFrom: "Morning", shiftTo, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
-    pushActivity({ kind: "handover", message: `Handover note for ${shiftTo} shift`, actor: currentUser.name, role: currentUser.role });
+  function addCalendarEvent(e: Omit<CalendarEvent, "id">) {
+    const id = `CE-${calendarEvents.length + 100}`;
+    setCalendarEvents((prev) => [{ ...e, id }, ...prev]);
+    pushActivity({ kind: "delivery", message: `Calendar event added: ${e.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function addPromoNote(promoId: string, message: string) {
+    setPromoStock((prev) => prev.map((p) => p.id === promoId ? {
+      ...p,
+      notes: [...p.notes, { id: `PN-${Date.now()}`, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() }],
+    } : p));
+    pushActivity({ kind: "comment", message: `Promo note added`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function addVisit(v: Omit<FieldVisit, "id">) {
+    setVisits((prev) => [...prev, { ...v, id: `FV-${prev.length + 100}` }]);
+    pushActivity({ kind: "delivery", message: `Visit scheduled: ${v.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function updateVisit(id: string, patch: Partial<FieldVisit>) {
+    setVisits((prev) => prev.map((v) => v.id === id ? { ...v, ...patch } : v));
+  }
+
+  function addFieldLog(e: Omit<FieldLogEntry, "id" | "createdAt">) {
+    const entry: FieldLogEntry = { ...e, id: `FL-${fieldLog.length + 100}`, createdAt: new Date().toISOString() };
+    setFieldLog((prev) => [entry, ...prev]);
+    // Auto-deduct promo stock
+    if (e.productsUsed.length) {
+      setPromoStock((prev) => prev.map((p) => {
+        const used = e.productsUsed.find((u) => u.promoStockId === p.id);
+        return used ? { ...p, onHand: Math.max(0, p.onHand - used.quantity) } : p;
+      }));
+    }
+    pushActivity({ kind: "delivery", message: `Field log added for ${e.customer}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function createAuthRequest(r: Omit<AuthorisationRequest, "id" | "createdAt" | "status" | "requestedBy" | "requestedByRole">) {
+    const req: AuthorisationRequest = {
+      ...r,
+      id: `AR-${String(authRequests.length + 100).padStart(3, "0")}`,
+      createdAt: new Date().toISOString(),
+      status: "PENDING",
+      requestedBy: currentUser.name,
+      requestedByRole: currentUser.role,
+    };
+    setAuthRequests((prev) => [req, ...prev]);
+    pushActivity({ kind: "alert", message: `Authorisation request ${req.id} raised`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function decideAuthRequest(id: string, decision: "APPROVED" | "REJECTED", note: string) {
+    setAuthRequests((prev) => prev.map((r) => r.id === id ? {
+      ...r, status: decision, decidedBy: currentUser.name, decidedAt: new Date().toISOString(), decisionNote: note,
+    } : r));
+    pushActivity({ kind: "alert", message: `Request ${id} ${decision.toLowerCase()}`, actor: currentUser.name, role: currentUser.role });
   }
 
   // ===== Derived =====
@@ -549,7 +628,7 @@ export function CospharmDashboard() {
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer"}>
               <Megaphone className="size-4" /> Marketer
             </TabsTrigger>
-            <TabsTrigger value="handover" className="gap-1.5"><History className="size-4" /> Handover</TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
             <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
               <UserCog className="size-4" /> Admin
@@ -579,7 +658,7 @@ export function CospharmDashboard() {
             <div className="grid gap-6 lg:grid-cols-3">
               <LiveActivityFeed events={activity} />
               <StockRiskSummary items={stock} />
-              <HandoverNotesCard notes={handovers} canCreate={can(role, "handover.create")} onCreate={addHandover} />
+              <UpcomingEventsCard events={calendarEvents} onSeeAll={() => setTab("calendar")} />
             </div>
 
             {tasks.some((t) => t.pendingVerification) && can(role, "task.verify") ? (
@@ -791,18 +870,32 @@ export function CospharmDashboard() {
 
           {/* ============ MARKETER ============ */}
           <TabsContent value="marketer" className="space-y-6">
-            <MarketerDashboard
+            <MarketerModule
               user={currentUser}
               deliveries={deliveries}
               comments={comments}
+              promoStock={promoStock}
+              visits={visits}
+              fieldLog={fieldLog}
+              authRequests={authRequests}
               onOpenDelivery={setOpenDeliveryId}
-              onAddComment={(id, type, msg) => addComment(id, type, msg, "DELIVERY")}
+              onAddPromoNote={addPromoNote}
+              onAddVisit={addVisit}
+              onUpdateVisit={updateVisit}
+              onAddFieldLog={addFieldLog}
+              onCreateAuthRequest={createAuthRequest}
+              onDecideAuthRequest={decideAuthRequest}
             />
           </TabsContent>
 
-          {/* ============ HANDOVER ============ */}
-          <TabsContent value="handover" className="space-y-4">
-            <HandoverNotesCard notes={handovers} canCreate={can(role, "handover.create")} onCreate={addHandover} full />
+          {/* ============ CALENDAR ============ */}
+          <TabsContent value="calendar" className="space-y-4">
+            <OperationsCalendar
+              events={calendarEvents}
+              user={currentUser}
+              canCreate={["admin", "supervisor", "dispatch_supervisor", "marketer"].includes(role)}
+              onAdd={addCalendarEvent}
+            />
           </TabsContent>
 
           {/* ============ AUDIT ============ */}
@@ -1168,210 +1261,38 @@ function SummaryRow({ label, count, tone }: { label: string; count: number; tone
   );
 }
 
-function HandoverNotesCard({
-  notes,
-  canCreate,
-  onCreate,
-  full = false,
-}: {
-  notes: HandoverNote[];
-  canCreate: boolean;
-  onCreate: (msg: string, shiftTo: HandoverNote["shiftTo"]) => void;
-  full?: boolean;
-}) {
-  const [draft, setDraft] = useState("");
-  const [shiftTo, setShiftTo] = useState<HandoverNote["shiftTo"]>("Afternoon");
-  const latest = notes[0];
+function UpcomingEventsCard({ events, onSeeAll }: { events: CalendarEvent[]; onSeeAll: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = [...events]
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 5);
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <History className="size-4" /> Shift handover notes
+          <CalendarDays className="size-4" /> Upcoming events
         </CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">For unresolved tasks, stock issues, and delivery risks.</p>
+        <Button size="sm" variant="ghost" onClick={onSeeAll}>See all</Button>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {latest ? (
-          <div className="rounded-md border bg-secondary/30 p-3 text-xs">
-            <p className="mb-1 text-[11px] text-muted-foreground">
-              {latest.shiftFrom} → {latest.shiftTo} · {latest.authorName} · {new Date(latest.createdAt).toLocaleString()}
-            </p>
-            <p className="text-sm">{latest.message}</p>
-          </div>
+      <CardContent className="space-y-2">
+        {upcoming.length === 0 ? (
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">No upcoming events.</p>
         ) : (
-          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">No handover notes yet.</p>
-        )}
-
-        {full && notes.length > 1 ? (
-          <div className="space-y-2">
-            {notes.slice(1).map((n) => (
-              <div key={n.id} className="rounded-md border p-3 text-xs">
-                <p className="mb-1 text-[11px] text-muted-foreground">
-                  {n.shiftFrom} → {n.shiftTo} · {n.authorName} · {new Date(n.createdAt).toLocaleString()}
-                </p>
-                <p>{n.message}</p>
+          upcoming.map((e) => (
+            <div key={e.id} className="rounded-md border p-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium truncate">{e.important ? "★ " : ""}{e.title}</p>
+                <span className="text-[10px] uppercase text-muted-foreground">{e.type}</span>
               </div>
-            ))}
-          </div>
-        ) : null}
-
-        {canCreate ? (
-          <div className="space-y-2">
-            <Select value={shiftTo} onValueChange={(v) => setShiftTo(v as HandoverNote["shiftTo"])}>
-              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Morning">→ Morning</SelectItem>
-                <SelectItem value="Afternoon">→ Afternoon</SelectItem>
-                <SelectItem value="Night">→ Night</SelectItem>
-              </SelectContent>
-            </Select>
-            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Unresolved tasks, stock issues, delivery risks…" />
-            <Button size="sm" disabled={draft.trim().length < 4} onClick={() => { onCreate(draft.trim(), shiftTo); setDraft(""); }}>
-              Post handover
-            </Button>
-          </div>
-        ) : (
-          <p className="text-[11px] text-muted-foreground">Only supervisors and admins can post handover notes.</p>
+              <p className="text-[11px] text-muted-foreground">
+                {new Date(e.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+                {e.time ? ` · ${e.time}` : ""}{e.owner ? ` · ${e.owner}` : ""}
+              </p>
+            </div>
+          ))
         )}
       </CardContent>
     </Card>
-  );
-}
-
-// ===== Marketer dashboard =====
-function MarketerDashboard({
-  user,
-  deliveries,
-  comments,
-  onOpenDelivery,
-  onAddComment,
-}: {
-  user: CurrentUser;
-  deliveries: Delivery[];
-  comments: Comment[];
-  onOpenDelivery: (id: string) => void;
-  onAddComment: (id: string, type: CommentType, msg: string) => void;
-}) {
-  const [filter, setFilter] = useState<"ALL" | "DELIVERED" | "PENDING" | "AT_RISK" | "LATE" | "TODAY">("ALL");
-  const mine = useMemo(() => {
-    if (user.role === "marketer") return deliveries.filter((d) => d.assignedMarketer === user.name);
-    return deliveries;
-  }, [deliveries, user]);
-
-  const filtered = useMemo(() => {
-    switch (filter) {
-      case "DELIVERED": return mine.filter((d) => d.status === "DELIVERED");
-      case "PENDING": return mine.filter((d) => ["PENDING", "IN_PROGRESS"].includes(d.status));
-      case "AT_RISK": return mine.filter((d) => ["AT_RISK", "BLOCKED"].includes(d.status));
-      case "LATE": return mine.filter((d) => d.status === "LATE");
-      case "TODAY": return mine.filter((d) => d.dueDate === todayIso);
-      default: return mine;
-    }
-  }, [mine, filter]);
-
-  const deliveredToday = mine.filter((d) => d.status === "DELIVERED" && d.dueDate === todayIso).length;
-  const pending = mine.filter((d) => ["PENDING", "IN_PROGRESS"].includes(d.status)).length;
-  const atRisk = mine.filter((d) => ["AT_RISK", "BLOCKED"].includes(d.status)).length;
-  const late = mine.filter((d) => d.status === "LATE").length;
-  const followUps = mine.filter((d) => ["LATE", "BLOCKED", "AT_RISK"].includes(d.status)).length;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={deliveredToday} sub="Main success metric" tone="green" />
-        <KpiCard icon={<ShieldCheck className="size-5" />} label="Daily target" value={`${deliveredToday}/${TARGET_DELIVERIES_PER_DAY}`} sub={`${Math.round((deliveredToday / TARGET_DELIVERIES_PER_DAY) * 100)}% of goal`} />
-        <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pending} sub="Awaiting fulfillment" tone="yellow" />
-        <KpiCard icon={<AlertTriangle className="size-5" />} label="At risk" value={atRisk} sub="May fail today" tone="yellow" />
-        <KpiCard icon={<AlertTriangle className="size-5" />} label="Late" value={late} sub="Past cutoff" tone="red" />
-        <KpiCard icon={<Megaphone className="size-5" />} label="Follow-ups" value={followUps} sub="Need customer contact" tone="red" />
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-base font-semibold">My orders</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {user.role === "marketer" ? "Orders assigned to you." : "All marketer orders (supervisor view)."} Marketers cannot approve warehouse tasks without supervisor permission.
-            </p>
-          </div>
-          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All</SelectItem>
-              <SelectItem value="TODAY">Today</SelectItem>
-              <SelectItem value="DELIVERED">Delivered</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="AT_RISK">At risk</SelectItem>
-              <SelectItem value="LATE">Late</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[180px]">Progress</TableHead>
-                <TableHead>Current step</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Last comment</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((d) => {
-                const badge = deliveryStatusBadge(d.status);
-                const current = getCurrentStep(d.steps);
-                const pct = getProgressPercentage(d.steps);
-                const lastComment = [...comments].reverse().find((c) => c.relatedEntityId === d.id);
-                return (
-                  <TableRow key={d.id} className="cursor-pointer" onClick={() => onOpenDelivery(d.id)}>
-                    <TableCell className="font-mono text-xs">{d.id}</TableCell>
-                    <TableCell className="text-sm font-medium">{d.customerName}</TableCell>
-                    <TableCell><StatusBadge status={badge.tone} label={badge.label} /></TableCell>
-                    <TableCell>
-                      <Progress value={pct} className="h-1.5" />
-                      <p className="mt-1 text-[10px] text-muted-foreground">{pct}%</p>
-                    </TableCell>
-                    <TableCell className="text-xs">Step {current.stepNumber} · {current.name}</TableCell>
-                    <TableCell className="text-xs">{d.dueDate}{d.delayReason ? <p className="text-status-red">{d.delayReason}</p> : null}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">{lastComment?.message ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDelivery(d.id); }}>
-                        Add note
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Customer follow-up queue</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {mine.filter((d) => ["LATE", "BLOCKED", "AT_RISK"].includes(d.status)).map((d) => (
-            <div key={d.id} className="rounded-md border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">{d.customerName}</p>
-                  <p className="text-xs text-muted-foreground">{d.id} · {d.status} · due {d.dueDate}</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => onOpenDelivery(d.id)}>Open & add customer note</Button>
-              </div>
-            </div>
-          ))}
-          {mine.filter((d) => ["LATE", "BLOCKED", "AT_RISK"].includes(d.status)).length === 0 ? (
-            <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">No customers need follow-up right now.</p>
-          ) : null}
-        </CardContent>
-      </Card>
-    </div>
   );
 }

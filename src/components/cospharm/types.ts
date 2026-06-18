@@ -187,3 +187,105 @@ export type ActivityEvent = {
   role: Role;
   timestamp: string;
 };
+
+// ===== Marketer module =====
+
+export type PromoStockNote = {
+  id: string;
+  authorName: string;
+  authorRole: Role;
+  message: string;
+  createdAt: string;
+};
+
+export type PromoStockItem = {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  onHand: number;
+  allocated: number;
+  expiry?: string;
+  notes: PromoStockNote[];
+};
+
+export type FieldVisitType =
+  | "CUSTOMER_VISIT"
+  | "ACTIVATION"
+  | "OSC"
+  | "MEETING"
+  | "TRIP"
+  | "AUDIT"
+  | "STOCKTAKE"
+  | "DEADLINE"
+  | "OTHER";
+
+export type FieldVisit = {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time?: string;
+  type: FieldVisitType;
+  marketer?: string;
+  customer?: string;
+  location?: string;
+  notes?: string;
+  status: "PLANNED" | "DONE" | "CANCELLED";
+};
+
+export type FieldLogEntry = {
+  id: string;
+  date: string;
+  marketer: string;
+  customer: string;
+  visitType: FieldVisitType;
+  outcome: "SALE" | "FOLLOW_UP" | "SAMPLE_GIVEN" | "NO_INTEREST" | "INFO_ONLY";
+  productsUsed: { promoStockId: string; productName: string; quantity: number }[];
+  notes: string;
+  createdAt: string;
+};
+
+export type AuthRequestType = "PROMO_RELEASE" | "PRICE_OVERRIDE" | "CREDIT_TERM" | "EMERGENCY_ORDER" | "TRAVEL" | "EXPENSE";
+export type AuthRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type AuthorisationRequest = {
+  id: string;
+  type: AuthRequestType;
+  requestedBy: string;
+  requestedByRole: Role;
+  customer?: string;
+  details: string;
+  amount?: number;
+  createdAt: string;
+  status: AuthRequestStatus;
+  decidedBy?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+};
+
+// ===== Operations calendar =====
+
+export type CalendarEventType =
+  | "MEETING"
+  | "AUDIT"
+  | "TRIP"
+  | "ACTIVATION"
+  | "OSC"
+  | "DEADLINE"
+  | "STOCKTAKE"
+  | "TRAINING"
+  | "HOLIDAY"
+  | "OTHER";
+
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  endDate?: string;
+  time?: string;
+  type: CalendarEventType;
+  owner?: string;
+  location?: string;
+  description?: string;
+  important?: boolean;
+};
