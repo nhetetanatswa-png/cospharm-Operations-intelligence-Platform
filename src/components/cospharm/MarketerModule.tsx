@@ -659,11 +659,13 @@ function outcomeTone(o: FieldLogEntry["outcome"]) {
 function RequestsTab({
   user,
   requests,
+  emergencyOrders,
   onCreate,
   onDecide,
 }: {
   user: CurrentUser;
   requests: AuthorisationRequest[];
+  emergencyOrders: EmergencyOrder[];
   onCreate: (r: Omit<AuthorisationRequest, "id" | "createdAt" | "status" | "requestedBy" | "requestedByRole">) => void;
   onDecide: (id: string, decision: "APPROVED" | "REJECTED", note: string) => void;
 }) {
@@ -678,6 +680,8 @@ function RequestsTab({
   });
 
   const canApprove = ["admin", "supervisor", "dispatch_supervisor"].includes(user.role);
+  const promoRequests = requests.filter((r) => r.type === "PROMO_RELEASE" || r.type === "PROMO_RELEASE");
+  const otherRequests = requests.filter((r) => r.type !== "PROMO_RELEASE");
 
   function submit() {
     if (form.details.trim().length < 3) return;
@@ -692,53 +696,111 @@ function RequestsTab({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+    <section className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <CardTitle className="text-base font-semibold flex items-center gap-2"><FileSignature className="size-4" /> Requests & authorisations</CardTitle>
-          <p className="text-xs text-muted-foreground">Raise approval requests for promo releases, price overrides, credit terms, emergency orders, travel and expenses.</p>
+          <h3 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+            <FileSignature className="size-5" /> Requests & authorisations
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Raise approval requests for promo releases, price overrides, credit terms, travel and expenses.
+          </p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)} className="gap-1.5"><Plus className="size-4" /> New request</Button>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Requested by</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Details</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {requests.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-mono text-xs">{r.id}</TableCell>
-                <TableCell className="text-xs">{AUTH_LABEL[r.type]}</TableCell>
-                <TableCell className="text-xs">{r.requestedBy}</TableCell>
-                <TableCell className="text-xs">{r.customer ?? "—"}</TableCell>
-                <TableCell className="text-xs max-w-[220px] truncate">{r.details}</TableCell>
-                <TableCell className="text-xs">{r.amount ? `${r.amount}` : "—"}</TableCell>
-                <TableCell><StatusBadge status={statusTone(r.status)} label={r.status} /></TableCell>
-                <TableCell className="text-right">
-                  {r.status === "PENDING" && canApprove ? (
-                    <Button size="sm" variant="outline" onClick={() => { setDecideFor(r); setDecisionNote(""); }}>Decide</Button>
-                  ) : r.decidedBy ? (
-                    <span className="text-[11px] text-muted-foreground">{r.decidedBy}</span>
-                  ) : null}
-                </TableCell>
-              </TableRow>
-            ))}
-            {requests.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-6">No requests yet.</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
+        <Button size="sm" onClick={() => setOpen(true)} className="gap-1.5">
+          <Plus className="size-4" /> New request
+        </Button>
+      </div>
+
+      {/* Section A — Promo stock requests */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold">Promo stock requests</h4>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {promoRequests.length === 0 && (
+            <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground sm:col-span-2">
+              No promo stock requests yet.
+            </p>
+          )}
+          {promoRequests.map((r) => (
+            <div key={r.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-[14px] font-semibold leading-tight">
+                  {r.details.split(" ").slice(0, 3).join(" ")}
+                  {r.amount ? <span className="ml-1 text-muted-foreground">× {r.amount}</span> : null}
+                </p>
+                <PillBadge status={r.status} />
+              </div>
+              <p className="text-[13px] text-muted-foreground">{r.details}</p>
+              <p className="mt-3 text-[12px] text-muted-foreground">
+                {r.requestedBy} · {new Date(r.createdAt).toLocaleString(undefined, {
+                  month: "numeric", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
+                })}
+              </p>
+              {r.status === "PENDING" && canApprove ? (
+                <div className="mt-3">
+                  <Button size="sm" variant="outline" onClick={() => { setDecideFor(r); setDecisionNote(""); }}>
+                    Decide
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section B — Emergency order requests */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold">Emergency order requests</h4>
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {emergencyOrders.length === 0 ? (
+            <p className="p-4 text-center text-xs text-muted-foreground">No emergency orders.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {emergencyOrders.map((o) => (
+                <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold">
+                      <span className="font-mono">{o.id}</span> · {o.customerName}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {o.items.length} item{o.items.length === 1 ? "" : "s"} · {o.orderedBy}
+                    </p>
+                  </div>
+                  <EmergencyPill status={o.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Other requests fallback */}
+      {otherRequests.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold">Other authorisations</h4>
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <ul className="divide-y divide-border">
+              {otherRequests.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold">
+                      <span className="font-mono">{r.id}</span> · {AUTH_LABEL[r.type]}
+                    </p>
+                    <p className="truncate text-[12px] text-muted-foreground">{r.details}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <PillBadge status={r.status} />
+                    {r.status === "PENDING" && canApprove ? (
+                      <Button size="sm" variant="outline" onClick={() => { setDecideFor(r); setDecisionNote(""); }}>
+                        Decide
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -785,7 +847,37 @@ function RequestsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
+  );
+}
+
+function PillBadge({ status }: { status: AuthRequestStatus }) {
+  const styles =
+    status === "APPROVED"
+      ? "bg-[oklch(0.92_0.05_250)] text-[oklch(0.35_0.13_260)]"
+      : status === "REJECTED"
+        ? "bg-status-red/15 text-status-red"
+        : "bg-status-yellow/30 text-status-yellow-foreground";
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${styles}`}>
+      {status}
+    </span>
+  );
+}
+
+function EmergencyPill({ status }: { status: EmergencyOrder["status"] }) {
+  const label = status.replace(/_/g, " ");
+  const isDispatched = status === "DISPATCHED" || status === "DELIVERED" || status === "ASSIGNED_TO_DRIVER";
+  const isPending = status === "PENDING_APPROVAL" || status === "APPROVED";
+  const styles = isDispatched
+    ? "bg-[oklch(0.92_0.05_250)] text-[oklch(0.35_0.13_260)] border-transparent"
+    : isPending
+      ? "border border-status-yellow/50 bg-status-yellow/15 text-status-yellow-foreground"
+      : "bg-status-red/15 text-status-red border-transparent";
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${styles}`}>
+      {label}
+    </span>
   );
 }
 
