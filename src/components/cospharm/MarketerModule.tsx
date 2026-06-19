@@ -35,6 +35,7 @@ import type {
   CommentType,
   CurrentUser,
   Delivery,
+  EmergencyOrder,
   FieldLogEntry,
   FieldVisit,
   FieldVisitType,
@@ -45,11 +46,11 @@ import type {
 type MarketerTab = "deliveries" | "promo" | "calendar" | "log" | "auth";
 
 const TAB_META: { value: MarketerTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { value: "deliveries", label: "My Deliveries", icon: Truck },
-  { value: "promo", label: "Promo Stock Room", icon: Package },
-  { value: "calendar", label: "Field Calendar", icon: CalendarDays },
-  { value: "log", label: "Field Log", icon: ClipboardCheck },
-  { value: "auth", label: "Requests & Authorisations", icon: FileSignature },
+  { value: "deliveries", label: "My deliveries", icon: Truck },
+  { value: "promo", label: "Promo stock room", icon: Package },
+  { value: "calendar", label: "Field calendar", icon: CalendarDays },
+  { value: "log", label: "Field log", icon: ClipboardCheck },
+  { value: "auth", label: "Requests & authorisations", icon: FileSignature },
 ];
 
 const VISIT_LABEL: Record<FieldVisitType, string> = {
@@ -81,6 +82,7 @@ export function MarketerModule({
   visits,
   fieldLog,
   authRequests,
+  emergencyOrders = [],
   onOpenDelivery,
   onAddPromoNote,
   onAddVisit,
@@ -96,6 +98,7 @@ export function MarketerModule({
   visits: FieldVisit[];
   fieldLog: FieldLogEntry[];
   authRequests: AuthorisationRequest[];
+  emergencyOrders?: EmergencyOrder[];
   onOpenDelivery: (id: string) => void;
   onAddPromoNote: (promoId: string, message: string) => void;
   onAddVisit: (visit: Omit<FieldVisit, "id">) => void;
@@ -124,41 +127,47 @@ export function MarketerModule({
     [authRequests, user, isMarketer],
   );
 
-  return (
-    <div className="flex flex-col gap-4 lg:flex-row">
-      {/* Internal sidebar */}
-      <aside className="lg:w-56 shrink-0">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Megaphone className="size-4" /> Marketer module
-            </CardTitle>
-            <p className="text-[11px] text-muted-foreground">{user.name} · {ROLE_LABEL[user.role]}</p>
-          </CardHeader>
-          <CardContent className="p-2">
-            <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-              {TAB_META.map((t) => {
-                const Icon = t.icon;
-                const active = tab === t.value;
-                return (
-                  <button
-                    key={t.value}
-                    onClick={() => setTab(t.value)}
-                    className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium transition ${
-                      active ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-foreground/80"
-                    }`}
-                  >
-                    <Icon className="size-4" />
-                    <span className="whitespace-nowrap">{t.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </CardContent>
-        </Card>
-      </aside>
+  const heading = isMarketer ? "Operations dashboard" : "Marketer control panel";
 
-      <div className="flex-1 min-w-0 space-y-4">
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Megaphone className="size-4" /> {heading}
+          </h2>
+          <p className="text-[11px] text-muted-foreground">{user.name} · {ROLE_LABEL[user.role]}</p>
+        </div>
+      </div>
+
+      {/* Horizontal tab strip with navy underline */}
+      <div className="border-b border-border">
+        <nav className="flex gap-1 overflow-x-auto">
+          {TAB_META.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.value;
+            return (
+              <button
+                key={t.value}
+                onClick={() => setTab(t.value)}
+                className={`relative flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm transition ${
+                  active
+                    ? "font-semibold text-primary"
+                    : "font-medium text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="size-4" />
+                <span className="whitespace-nowrap">{t.label}</span>
+                {active ? (
+                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="min-w-0 space-y-4">
         {tab === "deliveries" && (
           <MyDeliveriesTab deliveries={myDeliveries} comments={comments} onOpen={onOpenDelivery} />
         )}
@@ -172,7 +181,13 @@ export function MarketerModule({
           <FieldLogTab user={user} entries={myLog} promoStock={promoStock} onAdd={onAddFieldLog} />
         )}
         {tab === "auth" && (
-          <RequestsTab user={user} requests={myRequests} onCreate={onCreateAuthRequest} onDecide={onDecideAuthRequest} />
+          <RequestsTab
+            user={user}
+            requests={myRequests}
+            emergencyOrders={emergencyOrders}
+            onCreate={onCreateAuthRequest}
+            onDecide={onDecideAuthRequest}
+          />
         )}
       </div>
     </div>
