@@ -183,6 +183,19 @@ const SEED_PROMO_STOCK: PromoStockItem[] = [
   ]},
   { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120, notes: [] },
   { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08", notes: [] },
+  { id: "PS-004", name: "Branded Tote Bags", sku: "PRM-TT-02", category: "Giveaways", onHand: 300, allocated: 60, notes: [] },
+  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03", notes: [
+    { id: "PN-2", authorName: "Tebogo Motsumi", authorRole: "marketer", message: "Holding 80 for the Francistown activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  ]},
+  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300, notes: [] },
+  { id: "PS-007", name: "Branded Lanyards", sku: "PRM-LN-05", category: "Giveaways", onHand: 250, allocated: 50, notes: [] },
+  { id: "PS-008", name: "Hand Sanitiser 60ml", sku: "PRM-HS-06", category: "Samples", onHand: 420, allocated: 90, expiry: "2026-10", notes: [] },
+  { id: "PS-009", name: "Pull-up Banners", sku: "PRM-BN-07", category: "Activation kit", onHand: 18, allocated: 4, notes: [
+    { id: "PN-3", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
+  ]},
+  { id: "PS-010", name: "Cospharm Branded Notebooks", sku: "PRM-NB-08", category: "Giveaways", onHand: 350, allocated: 70, notes: [] },
+  { id: "PS-011", name: "Multivitamin Sample Packs", sku: "PRM-MV-09", category: "Samples", onHand: 240, allocated: 60, expiry: "2027-01", notes: [] },
+  { id: "PS-012", name: "Cough Syrup Mini Bottles", sku: "PRM-CS-10", category: "Samples", onHand: 96, allocated: 16, expiry: "2026-09", notes: [] },
 ];
 
 const SEED_VISITS: FieldVisit[] = [
