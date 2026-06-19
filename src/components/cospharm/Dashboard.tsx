@@ -891,6 +891,7 @@ export function CospharmDashboard() {
               visits={visits}
               fieldLog={fieldLog}
               authRequests={authRequests}
+              emergencyOrders={emergencyOrders}
               onOpenDelivery={setOpenDeliveryId}
               onAddPromoNote={addPromoNote}
               onAddVisit={addVisit}
