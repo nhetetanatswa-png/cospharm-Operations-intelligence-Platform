@@ -680,7 +680,7 @@ function RequestsTab({
   });
 
   const canApprove = ["admin", "supervisor", "dispatch_supervisor"].includes(user.role);
-  const promoRequests = requests.filter((r) => r.type === "PROMO_RELEASE" || r.type === "PROMO_RELEASE");
+  const promoRequests = requests.filter((r) => r.type === "PROMO_RELEASE");
   const otherRequests = requests.filter((r) => r.type !== "PROMO_RELEASE");
 
   function submit() {
