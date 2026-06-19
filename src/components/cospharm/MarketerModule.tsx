@@ -283,51 +283,96 @@ function PromoStockRoomTab({
   onAddNote: (id: string, message: string) => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Package className="size-4" /> Promo Stock Room
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">Promotional stock allocated for marketing activations, samples and field use. Click an item to add a note bubble — visible to all marketers and supervisors.</p>
-      </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-xl font-semibold tracking-tight">Promo stock room</h3>
+        <p className="text-sm text-[color:var(--ring)]">
+          Promotional stock allocated for marketing activations, samples and field use. Click an item to
+          add a note bubble — visible to all marketers and supervisors.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
           <PromoCard key={it.id} item={it} user={user} onAddNote={(msg) => onAddNote(it.id, msg)} />
         ))}
         {items.length === 0 && (
-          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">No promo stock allocated.</p>
+          <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">
+            No promo stock allocated.
+          </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
 function PromoCard({ item, user, onAddNote }: { item: PromoStockItem; user: CurrentUser; onAddNote: (msg: string) => void }) {
   const [draft, setDraft] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const available = Math.max(0, item.onHand - item.allocated);
   const pct = item.onHand > 0 ? Math.round((available / item.onHand) * 100) : 0;
+
+  function send() {
+    if (draft.trim().length < 2) return;
+    onAddNote(draft.trim());
+    setDraft("");
+  }
+
   return (
-    <div className="rounded-md border bg-card p-3 space-y-3">
+    <div
+      onClick={() => textareaRef.current?.focus()}
+      className="flex cursor-text flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-md"
+    >
       <div>
-        <p className="font-medium text-sm">{item.name}</p>
-        <p className="font-mono text-[11px] text-muted-foreground">{item.sku} · {item.category}{item.expiry ? ` · exp ${item.expiry}` : ""}</p>
+        <p className="text-[15px] font-semibold leading-tight">{item.name}</p>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {item.sku} · {item.category}{item.expiry ? ` · exp ${item.expiry}` : ""}
+        </p>
       </div>
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Available {available} / {item.onHand}</span>
-          <span>{item.allocated} allocated</span>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[12px]">
+          <span className="font-medium text-foreground">Available {available} / {item.onHand}</span>
+          <span className="text-muted-foreground">{item.allocated} allocated</span>
         </div>
-        <Progress value={pct} className="h-1.5" />
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+        </div>
       </div>
+
       <div className="space-y-1.5">
         {item.notes.slice(-3).map((n) => (
           <NoteBubble key={n.id} note={n} />
         ))}
-        {item.notes.length === 0 && <p className="text-[11px] text-muted-foreground italic">No notes yet.</p>}
+        {item.notes.length === 0 && (
+          <p className="text-[11px] italic text-muted-foreground">No notes yet.</p>
+        )}
       </div>
-      <div className="flex items-end gap-2">
-        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={1} placeholder="Add a note bubble…" className="text-xs" />
-        <Button size="icon" variant="secondary" disabled={draft.trim().length < 2} onClick={() => { onAddNote(draft.trim()); setDraft(""); }}>
+
+      <div
+        className="flex items-end gap-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={1}
+          placeholder="Add a note bubble..."
+          className="min-h-[36px] resize-none text-xs"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <Button
+          size="icon"
+          className="size-9 shrink-0"
+          disabled={draft.trim().length < 2}
+          onClick={send}
+          aria-label="Post note"
+        >
           <Send className="size-3.5" />
         </Button>
       </div>
@@ -337,12 +382,21 @@ function PromoCard({ item, user, onAddNote }: { item: PromoStockItem; user: Curr
 }
 
 function NoteBubble({ note }: { note: PromoStockNote }) {
+  const initial = note.authorName.trim().charAt(0).toUpperCase();
+  const when = new Date(note.createdAt).toLocaleString(undefined, {
+    month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
   return (
-    <div className="rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 text-[11px]">
-      <p className="text-[10px] font-semibold text-muted-foreground">
-        {note.authorName} · {ROLE_LABEL[note.authorRole]} · {new Date(note.createdAt).toLocaleString()}
-      </p>
-      <p className="text-foreground">{note.message}</p>
+    <div className="flex items-start gap-2">
+      <div className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+        {initial}
+      </div>
+      <div className="flex-1 rounded-lg bg-secondary px-3 py-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {note.authorName} · {ROLE_LABEL[note.authorRole]} · {when}
+        </p>
+        <p className="mt-0.5 text-[13px] text-foreground">{note.message}</p>
+      </div>
     </div>
   );
 }
