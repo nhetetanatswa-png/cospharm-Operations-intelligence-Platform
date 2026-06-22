@@ -40,6 +40,13 @@ import { EmergencyOrders } from "./EmergencyOrders";
 import { MarketerModule } from "./MarketerModule";
 import { OperationsCalendar } from "./OperationsCalendar";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
+import { ROLE_USERS_FULL, STAFF_ROSTER } from "./staff";
+import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTORS } from "./mockClients";
+import { NotesDigest } from "./NotesDigest";
+import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
+import { RegulatoryModule } from "./RegulatoryModule";
+import { HRModule } from "./HRModule";
+import { Shield, HeartHandshake } from "lucide-react";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -68,6 +75,13 @@ import type {
   Role,
   StockItem,
   Task,
+  BatchRecord,
+  ColdChainZone,
+  ControlledDrugLog,
+  Inspection,
+  LeaveRecord,
+  License,
+  StaffCertification,
 } from "./types";
 import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
