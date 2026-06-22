@@ -727,8 +727,14 @@ export function CospharmDashboard() {
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Tasks</TabsTrigger>
             <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Stock</TabsTrigger>
-            <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer"}>
+            <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
               <Megaphone className="size-4" /> Marketer
+            </TabsTrigger>
+            <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
+              <Shield className="size-4" /> Regulatory
+            </TabsTrigger>
+            <TabsTrigger value="hr" className="gap-1.5" disabled={!can(role, "hr.view")}>
+              <HeartHandshake className="size-4" /> HR
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
@@ -739,6 +745,11 @@ export function CospharmDashboard() {
 
           {/* ============ OVERVIEW ============ */}
           <TabsContent value="overview" className="space-y-6">
+            <EmergencyOrdersBanner
+              deliveries={deliveries}
+              emergencyOrders={emergencyOrders}
+              onOpen={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+            />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`} sub="Target progress" tone="green" />
               <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pendingDeliveries} sub="Awaiting completion" tone="yellow" />
@@ -1003,7 +1014,33 @@ export function CospharmDashboard() {
 
           {/* ============ AUDIT ============ */}
           <TabsContent value="audit">
-            <AuditTrailCard entries={audit} />
+            <Tabs defaultValue="trail" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="trail">Audit trail</TabsTrigger>
+                <TabsTrigger value="digest">Notes digest</TabsTrigger>
+              </TabsList>
+              <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
+              <TabsContent value="digest">
+                <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          {/* ============ REGULATORY ============ */}
+          <TabsContent value="regulatory">
+            <RegulatoryModule
+              licenses={SEED_LICENSES}
+              zones={SEED_ZONES}
+              batches={SEED_BATCHES}
+              controlled={SEED_CONTROLLED}
+              inspection={SEED_INSPECTION}
+              deliveries={deliveries}
+            />
+          </TabsContent>
+
+          {/* ============ HR ============ */}
+          <TabsContent value="hr">
+            <HRModule certifications={SEED_CERTS} leave={SEED_LEAVE} licenses={SEED_LICENSES} />
           </TabsContent>
 
           {/* ============ ADMIN ============ */}
@@ -1118,18 +1155,13 @@ function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => voi
         </div>
         <div className="flex items-center gap-2">
           <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger className="w-[180px]" aria-label="Switch role">
+            <SelectTrigger className="w-[220px]" aria-label="Switch role">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="supervisor">Supervisor</SelectItem>
-              <SelectItem value="marketer">Marketer</SelectItem>
-              <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
-              <SelectItem value="warehouse_checker">Warehouse Checker</SelectItem>
-              <SelectItem value="dispatch_supervisor">Dispatch Supervisor</SelectItem>
-              <SelectItem value="dispatch_staff">Dispatch Staff</SelectItem>
-              <SelectItem value="staff">Staff</SelectItem>
+            <SelectContent className="max-h-[380px]">
+              {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div className="hidden text-right sm:block">
