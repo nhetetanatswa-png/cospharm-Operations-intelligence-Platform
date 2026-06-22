@@ -39,9 +39,19 @@ import type {
   FieldLogEntry,
   FieldVisit,
   FieldVisitType,
+  MarketingActivity,
   PromoStockItem,
   PromoStockNote,
 } from "./types";
+
+const ACTIVITY_LABEL: Record<MarketingActivity, string> = {
+  SITE_VISIT: "Site visit",
+  SAMPLE_DROP: "Sample drop",
+  PROMO_TALK: "Promotional talk",
+  TRAINING: "Training session",
+  STOCK_CHECK: "Stock check",
+  TELESALES_CALL: "Telesales call",
+};
 
 type MarketerTab = "deliveries" | "promo" | "calendar" | "log" | "auth";
 

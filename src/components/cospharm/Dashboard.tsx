@@ -345,7 +345,7 @@ const SEED_LEAVE: LeaveRecord[] = [
 export function CospharmDashboard() {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState<Role>("supervisor");
+  const [role, setRole] = useState<Role>("admin");
   const currentUser = ROLE_USERS[role];
 
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
