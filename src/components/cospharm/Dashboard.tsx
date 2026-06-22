@@ -191,20 +191,32 @@ const seedAudit = (): AuditEntry[] => [
 ];
 
 const SEED_PROMO_STOCK: PromoStockItem[] = [
-  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12", notes: [
-    { id: "PN-1", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12",
+    requestedBy: "Bisa", reasonForRequest: "Princess Marina open day this Friday — need 50 samples to hand out.",
+    requestStatus: "APPROVED", decidedBy: "Aobakwe",
+    notes: [
+    { id: "PN-1", authorName: "Lesego", authorRole: "marketing_supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
   ]},
-  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120, notes: [] },
-  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08", notes: [] },
+  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120,
+    requestedBy: "Sofia", reasonForRequest: "Telesales follow-up bundle for 60 pharmacies.", requestStatus: "PENDING",
+    notes: [] },
+  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08",
+    requestedBy: "Bakang", reasonForRequest: "Sample drop to 3 new clinics in Mogoditshane.", requestStatus: "DECLINED",
+    decidedBy: "Aobakwe",
+    notes: [] },
   { id: "PS-004", name: "Branded Tote Bags", sku: "PRM-TT-02", category: "Giveaways", onHand: 300, allocated: 60, notes: [] },
-  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03", notes: [
-    { id: "PN-2", authorName: "Tebogo Motsumi", authorRole: "marketer", message: "Holding 80 for the Francistown activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03",
+    requestedBy: "Lebo", reasonForRequest: "Gaborone Mall activation 80 samples.", requestStatus: "APPROVED", decidedBy: "Lesego",
+    notes: [
+    { id: "PN-2", authorName: "Lebo", authorRole: "marketer", message: "Holding 80 for the Gaborone activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
   ]},
-  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300, notes: [] },
+  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300,
+    requestedBy: "Sofia", reasonForRequest: "Mailout pack for telesales pipeline.", requestStatus: "PENDING",
+    notes: [] },
   { id: "PS-007", name: "Branded Lanyards", sku: "PRM-LN-05", category: "Giveaways", onHand: 250, allocated: 50, notes: [] },
   { id: "PS-008", name: "Hand Sanitiser 60ml", sku: "PRM-HS-06", category: "Samples", onHand: 420, allocated: 90, expiry: "2026-10", notes: [] },
   { id: "PS-009", name: "Pull-up Banners", sku: "PRM-BN-07", category: "Activation kit", onHand: 18, allocated: 4, notes: [
-    { id: "PN-3", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "PN-3", authorName: "Aobakwe", authorRole: "marketing_lead", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
   ]},
   { id: "PS-010", name: "Cospharm Branded Notebooks", sku: "PRM-NB-08", category: "Giveaways", onHand: 350, allocated: 70, notes: [] },
   { id: "PS-011", name: "Multivitamin Sample Packs", sku: "PRM-MV-09", category: "Samples", onHand: 240, allocated: 60, expiry: "2027-01", notes: [] },
@@ -212,24 +224,30 @@ const SEED_PROMO_STOCK: PromoStockItem[] = [
 ];
 
 const SEED_VISITS: FieldVisit[] = [
-  { id: "FV-1", title: "St. Mary's quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Chioma Eze", customer: "St. Mary's Clinic", location: "Lagos", notes: "Bring Q3 sales report", status: "PLANNED" },
-  { id: "FV-2", title: "OSC — Wuse Family Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Chioma Eze", customer: "Wuse Family Clinic", status: "PLANNED" },
+  { id: "FV-1", title: "Princess Marina quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Bisa", customer: "Princess Marina Hospital", location: "Gaborone", notes: "Bring Q3 sales report", status: "PLANNED" },
+  { id: "FV-2", title: "OSC — Acacia Medicare Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Bisa", customer: "Acacia Medicare Clinic", status: "PLANNED" },
 ];
 
 const SEED_FIELD_LOG: FieldLogEntry[] = [
-  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Chioma Eze", customer: "Lekki Pharmacy Plus", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Interested in expanded antibiotics range.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Sidilega Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Procurement lead interested in expanded antibiotics range; will revert next week.", createdAt: new Date(Date.now() - 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP"] },
+  { id: "FL-2", date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Lenmed Bokamoso Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Closed order for cardiovascular range; PO to follow.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), activities: ["SITE_VISIT", "PROMO_TALK"] },
+  { id: "FL-3", date: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Medplus Medical Centre", visitType: "ACTIVATION", outcome: "SAMPLE_GIVEN", productsUsed: [{ promoStockId: "PS-005", productName: "Vitamin C Sample Sachets", quantity: 40 }], notes: "Activation table outside reception; 40 sachets handed out.", createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP", "PROMO_TALK"] },
+  { id: "FL-4", date: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10), marketer: "Sofia", customer: "Mediland Healthcare Distributors", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [], notes: "Telesales call with procurement.", createdAt: new Date(Date.now() - 4 * 86400000).toISOString(), activities: ["TELESALES_CALL"] },
+  { id: "FL-5", date: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Acacia Medicare Clinic", visitType: "CUSTOMER_VISIT", outcome: "INFO_ONLY", productsUsed: [], notes: "Stock check — re-orders due in 2 weeks.", createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), activities: ["STOCK_CHECK"] },
+  { id: "FL-6", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Life Gaborone Private Hospital", visitType: "MEETING", outcome: "FOLLOW_UP", productsUsed: [], notes: "Training session on new respiratory range delivered to ward sisters.", createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), activities: ["TRAINING", "PROMO_TALK"] },
+  { id: "FL-7", date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Gaborone Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Order placed for paediatric line; awaiting credit clearance.", createdAt: new Date(Date.now() - 9 * 86400000).toISOString(), activities: ["SITE_VISIT"] },
 ];
 
 const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
-  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Chioma Eze", requestedByRole: "marketer", customer: "St. Mary's Clinic", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
+  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Bisa", requestedByRole: "marketer", customer: "Princess Marina Hospital", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
 ];
 
 const SEED_CALENDAR: CalendarEvent[] = [
-  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Mary Adeyemi", description: "Full warehouse count", important: true },
-  { id: "CE-2", title: "Internal audit", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Olu Adebayo", important: true },
-  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Chioma Eze", location: "Gaborone Mall" },
-  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Thato Moremi" },
-  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Admin", important: true },
+  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Legkotla P.", description: "Full warehouse count", important: true },
+  { id: "CE-2", title: "BoMRA inspection", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Tariro", important: true },
+  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Bisa", location: "Gaborone Mall" },
+  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Aobakwe" },
+  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Mr. T", important: true },
 ];
 
 const TARGET_DELIVERIES_PER_DAY = 8;
