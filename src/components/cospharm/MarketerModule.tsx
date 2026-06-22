@@ -339,6 +339,21 @@ function PromoCard({ item, user, onAddNote }: { item: PromoStockItem; user: Curr
         </p>
       </div>
 
+      {item.requestedBy ? (
+        <div className="rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-[11px] leading-snug">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">Requested by {item.requestedBy}</span>
+            <PromoStatusBadge status={item.requestStatus ?? "PENDING"} />
+          </div>
+          {item.reasonForRequest ? (
+            <p className="mt-0.5 text-muted-foreground">{item.reasonForRequest}</p>
+          ) : null}
+          {item.decidedBy ? (
+            <p className="mt-0.5 text-[10px] text-muted-foreground">Decision by {item.decidedBy}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[12px]">
           <span className="font-medium text-foreground">Available {available} / {item.onHand}</span>
@@ -663,6 +678,20 @@ function outcomeTone(o: FieldLogEntry["outcome"]) {
   if (o === "SALE") return "green" as const;
   if (o === "NO_INTEREST") return "red" as const;
   return "yellow" as const;
+}
+
+function PromoStatusBadge({ status }: { status: NonNullable<PromoStockItem["requestStatus"]> }) {
+  const tone: Record<typeof status, string> = {
+    APPROVED: "bg-status-green/15 text-status-green ring-status-green/30",
+    DECLINED: "bg-status-red/15 text-status-red ring-status-red/30",
+    PENDING: "bg-status-yellow/25 text-status-yellow-foreground ring-status-yellow/40",
+  };
+  const label: Record<typeof status, string> = { APPROVED: "Approved", DECLINED: "Declined", PENDING: "Pending" };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${tone[status]}`}>
+      {label[status]}
+    </span>
+  );
 }
 
 // ===== 5. Requests & Authorisations =====
