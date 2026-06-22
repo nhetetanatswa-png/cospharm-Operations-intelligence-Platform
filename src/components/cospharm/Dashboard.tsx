@@ -114,26 +114,28 @@ const INITIAL_STOCK: StockItem[] = [
 
 const INITIAL_DELIVERIES: Delivery[] = [
   {
-    id: "D-1042", customerName: "St. Mary's Clinic", assignedMarketer: "Chioma Eze", assignedOps: "John Mensah",
+    id: "D-1042", customerName: "Princess Marina Hospital", assignedMarketer: "Bisa", assignedOps: "TT",
     dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
     requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1043", customerName: "Lekki Pharmacy Plus", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
+    id: "D-1043", customerName: "Sidilega Private Hospital", assignedMarketer: "Bisa", assignedOps: "Phuso",
     dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
     requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1044", customerName: "Garki Diabetes Centre", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
+    id: "D-1044", customerName: "Lenmed Bokamoso Private Hospital", assignedMarketer: "Bakang", assignedOps: "Tshepang",
     dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
     requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
     delayReason: "Insulin Glargine critically low",
     dispatchWindow: "AFTERNOON",
+    priority: "emergency",
+    emergencyFlaggedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
   },
   {
-    id: "D-1045", customerName: "Aso Rock Medical", assignedMarketer: "Femi Bola", assignedOps: "Tunde Aliu",
+    id: "D-1045", customerName: "Mediland Healthcare Distributors", assignedMarketer: "Lebo", assignedOps: "TT",
     dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
     requiredStockIds: ["S-007"], requiredTaskIds: [],
     dispatchWindow: "MORNING",
@@ -144,37 +146,34 @@ const INITIAL_DELIVERIES: Delivery[] = [
     notificationMethod: "CALL",
   },
   {
-    id: "D-1046", customerName: "Wuse Family Clinic", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
+    id: "D-1046", customerName: "Acacia Medicare Clinic", assignedMarketer: "Bisa", assignedOps: "Phuso",
     dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
     requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
     dispatchWindow: "AFTERNOON",
   },
   {
-    id: "D-1047", customerName: "Ikeja General Hospital", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
+    id: "D-1047", customerName: "Gaborone Private Hospital", assignedMarketer: "Bakang", assignedOps: "TT",
     dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
     requiredStockIds: ["S-004"], requiredTaskIds: [],
     dispatchWindow: "MORNING",
   },
+  {
+    id: "D-1048", customerName: "Medswana", assignedMarketer: "Lebo", assignedOps: "Tshepang",
+    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(3),
+    requiredStockIds: ["S-005"], requiredTaskIds: [],
+    dispatchWindow: "AFTERNOON",
+  },
 ];
 
-const ROLE_USERS: Record<Role, CurrentUser> = {
-  admin: { name: "Olu Adebayo", role: "admin" },
-  supervisor: { name: "Mary Adeyemi", role: "supervisor" },
-  staff: { name: "John Mensah", role: "staff" },
-  marketer: { name: "Chioma Eze", role: "marketer" },
-  warehouse_staff: { name: "John Mensah", role: "warehouse_staff" },
-  warehouse_checker: { name: "Ada Bello", role: "warehouse_checker" },
-  dispatch_supervisor: { name: "Tunde Aliu", role: "dispatch_supervisor" },
-  dispatch_staff: { name: "Grace Okoye", role: "dispatch_staff" },
-};
+const ROLE_USERS = ROLE_USERS_FULL;
 
-const STAFF = [
-  { name: "Ada Bello", role: "Pharmacy Tech", shift: "Morning", tasksDone: 6, tasksPending: 1 },
-  { name: "John Mensah", role: "Stock Clerk", shift: "Morning", tasksDone: 4, tasksPending: 2 },
-  { name: "Grace Okoye", role: "Pharmacist", shift: "Morning", tasksDone: 5, tasksPending: 0 },
-  { name: "Tunde Aliu", role: "Pharmacy Tech", shift: "Afternoon", tasksDone: 3, tasksPending: 1 },
-  { name: "Mary Adeyemi", role: "Supervisor", shift: "All-day", tasksDone: 7, tasksPending: 2 },
-];
+const STAFF = STAFF_ROSTER.map((s) => ({
+  name: s.name,
+  role: s.title,
+  shift: s.shift ?? "All-day",
+  tasksDone: Math.floor(Math.random() * 7) + 1,
+  tasksPending: Math.floor(Math.random() * 3),
+}));
 
 const seedAudit = (): AuditEntry[] => [
   {
