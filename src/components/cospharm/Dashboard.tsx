@@ -40,6 +40,13 @@ import { EmergencyOrders } from "./EmergencyOrders";
 import { MarketerModule } from "./MarketerModule";
 import { OperationsCalendar } from "./OperationsCalendar";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
+import { ROLE_USERS_FULL, STAFF_ROSTER } from "./staff";
+import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTORS } from "./mockClients";
+import { NotesDigest } from "./NotesDigest";
+import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
+import { RegulatoryModule } from "./RegulatoryModule";
+import { HRModule } from "./HRModule";
+import { Shield, HeartHandshake } from "lucide-react";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -68,6 +75,13 @@ import type {
   Role,
   StockItem,
   Task,
+  BatchRecord,
+  ColdChainZone,
+  ControlledDrugLog,
+  Inspection,
+  LeaveRecord,
+  License,
+  StaffCertification,
 } from "./types";
 import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
@@ -100,26 +114,28 @@ const INITIAL_STOCK: StockItem[] = [
 
 const INITIAL_DELIVERIES: Delivery[] = [
   {
-    id: "D-1042", customerName: "St. Mary's Clinic", assignedMarketer: "Chioma Eze", assignedOps: "John Mensah",
+    id: "D-1042", customerName: "Princess Marina Hospital", assignedMarketer: "Bisa", assignedOps: "TT",
     dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
     requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1043", customerName: "Lekki Pharmacy Plus", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
+    id: "D-1043", customerName: "Sidilega Private Hospital", assignedMarketer: "Bisa", assignedOps: "Phuso",
     dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
     requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1044", customerName: "Garki Diabetes Centre", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
+    id: "D-1044", customerName: "Lenmed Bokamoso Private Hospital", assignedMarketer: "Bakang", assignedOps: "Tshepang",
     dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
     requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
     delayReason: "Insulin Glargine critically low",
     dispatchWindow: "AFTERNOON",
+    priority: "emergency",
+    emergencyFlaggedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
   },
   {
-    id: "D-1045", customerName: "Aso Rock Medical", assignedMarketer: "Femi Bola", assignedOps: "Tunde Aliu",
+    id: "D-1045", customerName: "Mediland Healthcare Distributors", assignedMarketer: "Lebo", assignedOps: "TT",
     dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
     requiredStockIds: ["S-007"], requiredTaskIds: [],
     dispatchWindow: "MORNING",
@@ -130,37 +146,34 @@ const INITIAL_DELIVERIES: Delivery[] = [
     notificationMethod: "CALL",
   },
   {
-    id: "D-1046", customerName: "Wuse Family Clinic", assignedMarketer: "Chioma Eze", assignedOps: "Ada Bello",
+    id: "D-1046", customerName: "Acacia Medicare Clinic", assignedMarketer: "Bisa", assignedOps: "Phuso",
     dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
     requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
     dispatchWindow: "AFTERNOON",
   },
   {
-    id: "D-1047", customerName: "Ikeja General Hospital", assignedMarketer: "Femi Bola", assignedOps: "John Mensah",
+    id: "D-1047", customerName: "Gaborone Private Hospital", assignedMarketer: "Bakang", assignedOps: "TT",
     dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
     requiredStockIds: ["S-004"], requiredTaskIds: [],
     dispatchWindow: "MORNING",
   },
+  {
+    id: "D-1048", customerName: "Medswana", assignedMarketer: "Lebo", assignedOps: "Tshepang",
+    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(3),
+    requiredStockIds: ["S-005"], requiredTaskIds: [],
+    dispatchWindow: "AFTERNOON",
+  },
 ];
 
-const ROLE_USERS: Record<Role, CurrentUser> = {
-  admin: { name: "Olu Adebayo", role: "admin" },
-  supervisor: { name: "Mary Adeyemi", role: "supervisor" },
-  staff: { name: "John Mensah", role: "staff" },
-  marketer: { name: "Chioma Eze", role: "marketer" },
-  warehouse_staff: { name: "John Mensah", role: "warehouse_staff" },
-  warehouse_checker: { name: "Ada Bello", role: "warehouse_checker" },
-  dispatch_supervisor: { name: "Tunde Aliu", role: "dispatch_supervisor" },
-  dispatch_staff: { name: "Grace Okoye", role: "dispatch_staff" },
-};
+const ROLE_USERS = ROLE_USERS_FULL;
 
-const STAFF = [
-  { name: "Ada Bello", role: "Pharmacy Tech", shift: "Morning", tasksDone: 6, tasksPending: 1 },
-  { name: "John Mensah", role: "Stock Clerk", shift: "Morning", tasksDone: 4, tasksPending: 2 },
-  { name: "Grace Okoye", role: "Pharmacist", shift: "Morning", tasksDone: 5, tasksPending: 0 },
-  { name: "Tunde Aliu", role: "Pharmacy Tech", shift: "Afternoon", tasksDone: 3, tasksPending: 1 },
-  { name: "Mary Adeyemi", role: "Supervisor", shift: "All-day", tasksDone: 7, tasksPending: 2 },
-];
+const STAFF = STAFF_ROSTER.map((s) => ({
+  name: s.name,
+  role: s.title,
+  shift: s.shift ?? "All-day",
+  tasksDone: Math.floor(Math.random() * 7) + 1,
+  tasksPending: Math.floor(Math.random() * 3),
+}));
 
 const seedAudit = (): AuditEntry[] => [
   {
@@ -178,20 +191,32 @@ const seedAudit = (): AuditEntry[] => [
 ];
 
 const SEED_PROMO_STOCK: PromoStockItem[] = [
-  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12", notes: [
-    { id: "PN-1", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12",
+    requestedBy: "Bisa", reasonForRequest: "Princess Marina open day this Friday — need 50 samples to hand out.",
+    requestStatus: "APPROVED", decidedBy: "Aobakwe",
+    notes: [
+    { id: "PN-1", authorName: "Lesego", authorRole: "marketing_supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
   ]},
-  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120, notes: [] },
-  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08", notes: [] },
+  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120,
+    requestedBy: "Sofia", reasonForRequest: "Telesales follow-up bundle for 60 pharmacies.", requestStatus: "PENDING",
+    notes: [] },
+  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08",
+    requestedBy: "Bakang", reasonForRequest: "Sample drop to 3 new clinics in Mogoditshane.", requestStatus: "DECLINED",
+    decidedBy: "Aobakwe",
+    notes: [] },
   { id: "PS-004", name: "Branded Tote Bags", sku: "PRM-TT-02", category: "Giveaways", onHand: 300, allocated: 60, notes: [] },
-  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03", notes: [
-    { id: "PN-2", authorName: "Tebogo Motsumi", authorRole: "marketer", message: "Holding 80 for the Francistown activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03",
+    requestedBy: "Lebo", reasonForRequest: "Gaborone Mall activation 80 samples.", requestStatus: "APPROVED", decidedBy: "Lesego",
+    notes: [
+    { id: "PN-2", authorName: "Lebo", authorRole: "marketer", message: "Holding 80 for the Gaborone activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
   ]},
-  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300, notes: [] },
+  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300,
+    requestedBy: "Sofia", reasonForRequest: "Mailout pack for telesales pipeline.", requestStatus: "PENDING",
+    notes: [] },
   { id: "PS-007", name: "Branded Lanyards", sku: "PRM-LN-05", category: "Giveaways", onHand: 250, allocated: 50, notes: [] },
   { id: "PS-008", name: "Hand Sanitiser 60ml", sku: "PRM-HS-06", category: "Samples", onHand: 420, allocated: 90, expiry: "2026-10", notes: [] },
   { id: "PS-009", name: "Pull-up Banners", sku: "PRM-BN-07", category: "Activation kit", onHand: 18, allocated: 4, notes: [
-    { id: "PN-3", authorName: "Mary Adeyemi", authorRole: "supervisor", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "PN-3", authorName: "Aobakwe", authorRole: "marketing_lead", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
   ]},
   { id: "PS-010", name: "Cospharm Branded Notebooks", sku: "PRM-NB-08", category: "Giveaways", onHand: 350, allocated: 70, notes: [] },
   { id: "PS-011", name: "Multivitamin Sample Packs", sku: "PRM-MV-09", category: "Samples", onHand: 240, allocated: 60, expiry: "2027-01", notes: [] },
@@ -199,24 +224,30 @@ const SEED_PROMO_STOCK: PromoStockItem[] = [
 ];
 
 const SEED_VISITS: FieldVisit[] = [
-  { id: "FV-1", title: "St. Mary's quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Chioma Eze", customer: "St. Mary's Clinic", location: "Lagos", notes: "Bring Q3 sales report", status: "PLANNED" },
-  { id: "FV-2", title: "OSC — Wuse Family Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Chioma Eze", customer: "Wuse Family Clinic", status: "PLANNED" },
+  { id: "FV-1", title: "Princess Marina quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Bisa", customer: "Princess Marina Hospital", location: "Gaborone", notes: "Bring Q3 sales report", status: "PLANNED" },
+  { id: "FV-2", title: "OSC — Acacia Medicare Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Bisa", customer: "Acacia Medicare Clinic", status: "PLANNED" },
 ];
 
 const SEED_FIELD_LOG: FieldLogEntry[] = [
-  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Chioma Eze", customer: "Lekki Pharmacy Plus", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Interested in expanded antibiotics range.", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Sidilega Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Procurement lead interested in expanded antibiotics range; will revert next week.", createdAt: new Date(Date.now() - 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP"] },
+  { id: "FL-2", date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Lenmed Bokamoso Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Closed order for cardiovascular range; PO to follow.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), activities: ["SITE_VISIT", "PROMO_TALK"] },
+  { id: "FL-3", date: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Medplus Medical Centre", visitType: "ACTIVATION", outcome: "SAMPLE_GIVEN", productsUsed: [{ promoStockId: "PS-005", productName: "Vitamin C Sample Sachets", quantity: 40 }], notes: "Activation table outside reception; 40 sachets handed out.", createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP", "PROMO_TALK"] },
+  { id: "FL-4", date: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10), marketer: "Sofia", customer: "Mediland Healthcare Distributors", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [], notes: "Telesales call with procurement.", createdAt: new Date(Date.now() - 4 * 86400000).toISOString(), activities: ["TELESALES_CALL"] },
+  { id: "FL-5", date: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Acacia Medicare Clinic", visitType: "CUSTOMER_VISIT", outcome: "INFO_ONLY", productsUsed: [], notes: "Stock check — re-orders due in 2 weeks.", createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), activities: ["STOCK_CHECK"] },
+  { id: "FL-6", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Life Gaborone Private Hospital", visitType: "MEETING", outcome: "FOLLOW_UP", productsUsed: [], notes: "Training session on new respiratory range delivered to ward sisters.", createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), activities: ["TRAINING", "PROMO_TALK"] },
+  { id: "FL-7", date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Gaborone Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Order placed for paediatric line; awaiting credit clearance.", createdAt: new Date(Date.now() - 9 * 86400000).toISOString(), activities: ["SITE_VISIT"] },
 ];
 
 const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
-  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Chioma Eze", requestedByRole: "marketer", customer: "St. Mary's Clinic", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
+  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Bisa", requestedByRole: "marketer", customer: "Princess Marina Hospital", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
 ];
 
 const SEED_CALENDAR: CalendarEvent[] = [
-  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Mary Adeyemi", description: "Full warehouse count", important: true },
-  { id: "CE-2", title: "Internal audit", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Olu Adebayo", important: true },
-  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Chioma Eze", location: "Gaborone Mall" },
-  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Thato Moremi" },
-  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Admin", important: true },
+  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Legkotla P.", description: "Full warehouse count", important: true },
+  { id: "CE-2", title: "BoMRA inspection", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Tariro", important: true },
+  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Bisa", location: "Gaborone Mall" },
+  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Aobakwe" },
+  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Mr. T", important: true },
 ];
 
 const TARGET_DELIVERIES_PER_DAY = 8;
@@ -224,31 +255,89 @@ const TARGET_DELIVERIES_PER_DAY = 8;
 const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
   {
     id: "EMG-1001",
-    orderedBy: "Tebogo Motsumi",
+    orderedBy: "Bisa",
     orderedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    customerName: "BotswanaMed Clinic",
-    clientContact: "+267 71 234 567",
+    customerName: "Medplus Medical Centre",
+    clientContact: CLIENT_CONTACTS["Medplus Medical Centre"],
     items: [{ productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" }],
     reason: "Customer ran out mid-week; next scheduled dispatch is tomorrow.",
     status: "PENDING_APPROVAL",
   },
   {
     id: "EMG-1002",
-    orderedBy: "Mary Adeyemi",
+    orderedBy: "Lesego",
     orderedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-    customerName: "Gaborone Private Hospital",
-    clientContact: "+267 39 999 100",
+    customerName: "Sir Ketumile Masire Teaching Hospital",
+    clientContact: CLIENT_CONTACTS["Sir Ketumile Masire Teaching Hospital"],
     items: [
       { productName: "Surgical Gloves Medium", quantity: 100, urgencyNote: "Theatre running low" },
       { productName: "Paracetamol 500mg", quantity: 200, urgencyNote: "" },
     ],
     reason: "Theatre stock-out risk before tomorrow's window.",
-    authorisedBy: "Daniel Kgosi",
+    authorisedBy: "Mr. T",
     authorisedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    driverAssigned: "Mpho Raditlhokwa",
+    driverAssigned: "TT",
     estimatedDelivery: "14:30",
     status: "DISPATCHED",
   },
+];
+
+// ===== Regulatory & HR seed data =====
+function daysFromNow(d: number) { return new Date(Date.now() + d * 86400000).toISOString().slice(0, 10); }
+
+const SEED_LICENSES: License[] = [
+  { id: "LIC-1", type: "Wholesale Dealer's License", holder: "Cospharm (Pty) Ltd", issueDate: "2024-03-01", expiryDate: daysFromNow(120) },
+  { id: "LIC-2", type: "Qualified Person License", holder: "Tariro M. (QP)", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
+  { id: "LIC-3", type: "Import Permit", holder: "Shipment INV-7732", issueDate: daysFromNow(-15), expiryDate: daysFromNow(15) },
+  { id: "LIC-4", type: "Import Permit", holder: "Shipment INV-7741", issueDate: daysFromNow(-10), expiryDate: daysFromNow(80) },
+  { id: "LIC-5", type: "Export Permit", holder: "Shipment EXP-2210", issueDate: daysFromNow(-5), expiryDate: daysFromNow(-2) },
+  { id: "LIC-6", type: "Export Permit", holder: "Shipment EXP-2244", issueDate: daysFromNow(-1), expiryDate: daysFromNow(28) },
+];
+
+const SEED_ZONES: ColdChainZone[] = [
+  { id: "Z-1", name: "Cooler A — Vaccines", currentTempC: 4.1, targetRange: [2, 8], lastBreachAt: undefined, resolved: true },
+  { id: "Z-2", name: "Cooler B — Insulin", currentTempC: 6.5, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 9 * 86400000).toISOString(), breachDurationMins: 22, resolved: true },
+  { id: "Z-3", name: "Cooler C — Biologics", currentTempC: 9.2, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 2 * 3600000).toISOString(), breachDurationMins: 75, resolved: false },
+  { id: "Z-4", name: "Ambient Bay — Controlled", currentTempC: 22.0, targetRange: [15, 25], resolved: true },
+];
+
+const SEED_BATCHES: BatchRecord[] = [
+  { id: "B-1", batchNumber: "B-7741", product: "Paracetamol 500mg", expiry: daysFromNow(800), quantity: 1240, linkedDeliveryIds: ["D-1042", "D-1046"] },
+  { id: "B-2", batchNumber: "B-3320", product: "Amoxicillin 250mg", expiry: daysFromNow(120), quantity: 320, linkedDeliveryIds: ["D-1043"] },
+  { id: "B-3", batchNumber: "B-9011", product: "Insulin Glargine 100IU", expiry: daysFromNow(60), quantity: 28, linkedDeliveryIds: ["D-1044"] },
+  { id: "B-4", batchNumber: "B-2210", product: "Loratadine 10mg", expiry: daysFromNow(15), quantity: 12, linkedDeliveryIds: [] },
+  { id: "B-5", batchNumber: "B-8810", product: "ORS Sachets", expiry: daysFromNow(600), quantity: 540, linkedDeliveryIds: ["D-1048"] },
+];
+
+const SEED_CONTROLLED: ControlledDrugLog[] = [
+  { id: "CD-1", product: "Pethidine 50mg", batch: "B-PD-091", handler: "Tariro", action: "RECEIVED", timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
+  { id: "CD-2", product: "Morphine 10mg/ml", batch: "B-MP-244", handler: "Aman", action: "DISPENSED", timestamp: new Date(Date.now() - 3 * 3600000).toISOString() },
+  { id: "CD-3", product: "Diazepam 5mg", batch: "B-DZ-115", handler: "Alaska", action: "TRANSFERRED", timestamp: new Date(Date.now() - 1 * 3600000).toISOString() },
+];
+
+const SEED_INSPECTION: Inspection = {
+  lastDate: daysFromNow(-90),
+  nextDate: daysFromNow(10),
+  actions: [
+    { id: "CA-1", description: "Replace temperature logger in Cooler C", due: daysFromNow(-3), status: "OPEN" },
+    { id: "CA-2", description: "Update SOP for controlled drug transfers", due: daysFromNow(5), status: "OPEN" },
+    { id: "CA-3", description: "Renew QP delegation letter", due: daysFromNow(-20), status: "CLOSED" },
+  ],
+};
+
+const SEED_CERTS: StaffCertification[] = [
+  { id: "CR-1", staffName: "TT", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2023-01-10", expiryDate: daysFromNow(140) },
+  { id: "CR-2", staffName: "Phuso", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2024-05-01", expiryDate: daysFromNow(45) },
+  { id: "CR-3", staffName: "Tshepang", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", missing: true },
+  { id: "CR-4", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "COLD_CHAIN_HANDLING", issueDate: "2023-09-12", expiryDate: daysFromNow(200) },
+  { id: "CR-5", staffName: "Aman", staffRole: "Regulatory", type: "CONTROLLED_SUBSTANCES", issueDate: "2024-02-22", expiryDate: daysFromNow(20) },
+  { id: "CR-6", staffName: "Tariro", staffRole: "Regulatory", type: "QUALIFIED_PERSON", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
+  { id: "CR-7", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "FORKLIFT", issueDate: "2023-04-01", expiryDate: daysFromNow(330) },
+];
+
+const SEED_LEAVE: LeaveRecord[] = [
+  { id: "LV-1", staffName: "Tshepang", staffRole: "Driver", critical: true, from: daysFromNow(-1), to: daysFromNow(2), reason: "Sick leave" },
+  { id: "LV-2", staffName: "Sofia", staffRole: "Telesales", critical: false, from: daysFromNow(-2), to: daysFromNow(0), reason: "Annual leave" },
 ];
 
 // ===== Component =====
@@ -256,7 +345,7 @@ const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
 export function CospharmDashboard() {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState<Role>("supervisor");
+  const [role, setRole] = useState<Role>("admin");
   const currentUser = ROLE_USERS[role];
 
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
@@ -638,8 +727,14 @@ export function CospharmDashboard() {
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Tasks</TabsTrigger>
             <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Stock</TabsTrigger>
-            <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer"}>
+            <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
               <Megaphone className="size-4" /> Marketer
+            </TabsTrigger>
+            <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
+              <Shield className="size-4" /> Regulatory
+            </TabsTrigger>
+            <TabsTrigger value="hr" className="gap-1.5" disabled={!can(role, "hr.view")}>
+              <HeartHandshake className="size-4" /> HR
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
@@ -650,6 +745,11 @@ export function CospharmDashboard() {
 
           {/* ============ OVERVIEW ============ */}
           <TabsContent value="overview" className="space-y-6">
+            <EmergencyOrdersBanner
+              deliveries={deliveries}
+              emergencyOrders={emergencyOrders}
+              onOpen={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+            />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`} sub="Target progress" tone="green" />
               <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pendingDeliveries} sub="Awaiting completion" tone="yellow" />
@@ -914,7 +1014,33 @@ export function CospharmDashboard() {
 
           {/* ============ AUDIT ============ */}
           <TabsContent value="audit">
-            <AuditTrailCard entries={audit} />
+            <Tabs defaultValue="trail" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="trail">Audit trail</TabsTrigger>
+                <TabsTrigger value="digest">Notes digest</TabsTrigger>
+              </TabsList>
+              <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
+              <TabsContent value="digest">
+                <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          {/* ============ REGULATORY ============ */}
+          <TabsContent value="regulatory">
+            <RegulatoryModule
+              licenses={SEED_LICENSES}
+              zones={SEED_ZONES}
+              batches={SEED_BATCHES}
+              controlled={SEED_CONTROLLED}
+              inspection={SEED_INSPECTION}
+              deliveries={deliveries}
+            />
+          </TabsContent>
+
+          {/* ============ HR ============ */}
+          <TabsContent value="hr">
+            <HRModule certifications={SEED_CERTS} leave={SEED_LEAVE} licenses={SEED_LICENSES} />
           </TabsContent>
 
           {/* ============ ADMIN ============ */}
@@ -1029,18 +1155,13 @@ function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => voi
         </div>
         <div className="flex items-center gap-2">
           <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger className="w-[180px]" aria-label="Switch role">
+            <SelectTrigger className="w-[220px]" aria-label="Switch role">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="supervisor">Supervisor</SelectItem>
-              <SelectItem value="marketer">Marketer</SelectItem>
-              <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
-              <SelectItem value="warehouse_checker">Warehouse Checker</SelectItem>
-              <SelectItem value="dispatch_supervisor">Dispatch Supervisor</SelectItem>
-              <SelectItem value="dispatch_staff">Dispatch Staff</SelectItem>
-              <SelectItem value="staff">Staff</SelectItem>
+            <SelectContent className="max-h-[380px]">
+              {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div className="hidden text-right sm:block">

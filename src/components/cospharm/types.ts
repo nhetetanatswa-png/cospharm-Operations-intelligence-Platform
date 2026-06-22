@@ -8,7 +8,18 @@ export type Role =
   | "warehouse_staff"
   | "warehouse_checker"
   | "dispatch_supervisor"
-  | "dispatch_staff";
+  | "dispatch_staff"
+  | "ops_manager"
+  | "warehouse_supervisor"
+  | "dispatch"
+  | "regulatory"
+  | "front_desk"
+  | "general_manager"
+  | "procurement"
+  | "hr"
+  | "telesales"
+  | "marketing_lead"
+  | "marketing_supervisor";
 
 export type Task = {
   id: string;
@@ -99,6 +110,8 @@ export type Delivery = {
   notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
   resolutionPlan?: string;
   delayReasonAt?: string;
+  priority?: "normal" | "emergency";
+  emergencyFlaggedAt?: string;
 };
 
 export type DispatchWindow = "MORNING" | "AFTERNOON" | "EMERGENCY";
@@ -207,6 +220,10 @@ export type PromoStockItem = {
   allocated: number;
   expiry?: string;
   notes: PromoStockNote[];
+  requestedBy?: string;
+  reasonForRequest?: string;
+  requestStatus?: "PENDING" | "APPROVED" | "DECLINED";
+  decidedBy?: string;
 };
 
 export type FieldVisitType =
@@ -243,6 +260,96 @@ export type FieldLogEntry = {
   productsUsed: { promoStockId: string; productName: string; quantity: number }[];
   notes: string;
   createdAt: string;
+  activities?: MarketingActivity[];
+};
+
+export type MarketingActivity =
+  | "SITE_VISIT"
+  | "SAMPLE_DROP"
+  | "PROMO_TALK"
+  | "TRAINING"
+  | "STOCK_CHECK"
+  | "TELESALES_CALL";
+
+// ===== Regulatory =====
+export type RegulatoryStatus = "green" | "yellow" | "red";
+
+export type License = {
+  id: string;
+  type: string;
+  holder: string;
+  issueDate: string;
+  expiryDate: string;
+};
+
+export type ColdChainZone = {
+  id: string;
+  name: string;
+  currentTempC: number;
+  targetRange: [number, number];
+  lastBreachAt?: string;
+  breachDurationMins?: number;
+  resolved: boolean;
+};
+
+export type BatchRecord = {
+  id: string;
+  batchNumber: string;
+  product: string;
+  expiry: string; // YYYY-MM-DD
+  quantity: number;
+  linkedDeliveryIds: string[];
+};
+
+export type ControlledDrugLog = {
+  id: string;
+  product: string;
+  batch: string;
+  handler: string;
+  action: "RECEIVED" | "DISPENSED" | "TRANSFERRED";
+  timestamp: string;
+};
+
+export type CorrectiveAction = {
+  id: string;
+  description: string;
+  due: string; // YYYY-MM-DD
+  status: "OPEN" | "CLOSED";
+};
+
+export type Inspection = {
+  lastDate?: string;
+  nextDate?: string;
+  actions: CorrectiveAction[];
+};
+
+// ===== HR =====
+export type CertificationType =
+  | "DRIVERS_LICENSE_PDP"
+  | "COLD_CHAIN_HANDLING"
+  | "CONTROLLED_SUBSTANCES"
+  | "QUALIFIED_PERSON"
+  | "FIRST_AID"
+  | "FORKLIFT";
+
+export type StaffCertification = {
+  id: string;
+  staffName: string;
+  staffRole: string;
+  type: CertificationType;
+  issueDate?: string;
+  expiryDate?: string;
+  missing?: boolean;
+};
+
+export type LeaveRecord = {
+  id: string;
+  staffName: string;
+  staffRole: string; // e.g. "Driver", "Warehouse lead"
+  critical: boolean;
+  from: string;
+  to: string;
+  reason?: string;
 };
 
 export type AuthRequestType = "PROMO_RELEASE" | "PRICE_OVERRIDE" | "CREDIT_TERM" | "EMERGENCY_ORDER" | "TRAVEL" | "EXPENSE";

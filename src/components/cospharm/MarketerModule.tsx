@@ -39,9 +39,19 @@ import type {
   FieldLogEntry,
   FieldVisit,
   FieldVisitType,
+  MarketingActivity,
   PromoStockItem,
   PromoStockNote,
 } from "./types";
+
+const ACTIVITY_LABEL: Record<MarketingActivity, string> = {
+  SITE_VISIT: "Site visit",
+  SAMPLE_DROP: "Sample drop",
+  PROMO_TALK: "Promotional talk",
+  TRAINING: "Training session",
+  STOCK_CHECK: "Stock check",
+  TELESALES_CALL: "Telesales call",
+};
 
 type MarketerTab = "deliveries" | "promo" | "calendar" | "log" | "auth";
 
@@ -329,6 +339,21 @@ function PromoCard({ item, user, onAddNote }: { item: PromoStockItem; user: Curr
         </p>
       </div>
 
+      {item.requestedBy ? (
+        <div className="rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-[11px] leading-snug">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">Requested by {item.requestedBy}</span>
+            <PromoStatusBadge status={item.requestStatus ?? "PENDING"} />
+          </div>
+          {item.reasonForRequest ? (
+            <p className="mt-0.5 text-muted-foreground">{item.reasonForRequest}</p>
+          ) : null}
+          {item.decidedBy ? (
+            <p className="mt-0.5 text-[10px] text-muted-foreground">Decision by {item.decidedBy}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[12px]">
           <span className="font-medium text-foreground">Available {available} / {item.onHand}</span>
@@ -523,6 +548,7 @@ function FieldLogTab({
   onAdd: (e: Omit<FieldLogEntry, "id" | "createdAt">) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState<Omit<FieldLogEntry, "id" | "createdAt">>({
     date: new Date().toISOString().slice(0, 10),
     marketer: user.name,
@@ -531,6 +557,7 @@ function FieldLogTab({
     outcome: "FOLLOW_UP",
     productsUsed: [],
     notes: "",
+    activities: [],
   });
   const [promoId, setPromoId] = useState<string>(promoStock[0]?.id ?? "");
   const [qty, setQty] = useState(1);
@@ -542,19 +569,27 @@ function FieldLogTab({
     setQty(1);
   }
 
+  function toggleActivity(a: MarketingActivity) {
+    const cur = form.activities ?? [];
+    setForm({ ...form, activities: cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a] });
+  }
+
   function submit() {
     if (form.customer.trim().length < 2) return;
     onAdd(form);
     setOpen(false);
-    setForm({ ...form, customer: "", notes: "", productsUsed: [] });
+    setForm({ ...form, customer: "", notes: "", productsUsed: [], activities: [] });
   }
+
+  const sorted = [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const visible = sorted.slice(0, pageSize);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base font-semibold flex items-center gap-2"><ClipboardCheck className="size-4" /> Field log</CardTitle>
-          <p className="text-xs text-muted-foreground">Record outcomes from customer visits. Promo stock used here is automatically deducted.</p>
+          <p className="text-xs text-muted-foreground">Full visit history per marketer. Promo stock used is auto-deducted. {sorted.length} entries logged.</p>
         </div>
         <Button size="sm" onClick={() => setOpen(true)} className="gap-1.5"><Plus className="size-4" /> Log visit</Button>
       </CardHeader>
@@ -563,31 +598,49 @@ function FieldLogTab({
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
+              <TableHead>Marketer</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Activities</TableHead>
               <TableHead>Outcome</TableHead>
               <TableHead>Promo used</TableHead>
               <TableHead>Notes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entries.map((e) => (
+            {visible.map((e) => (
               <TableRow key={e.id}>
                 <TableCell className="text-xs">{e.date}</TableCell>
+                <TableCell className="text-xs">{e.marketer}</TableCell>
                 <TableCell className="text-sm font-medium">{e.customer}</TableCell>
                 <TableCell className="text-xs">{VISIT_LABEL[e.visitType]}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {(e.activities ?? []).map((a) => (
+                      <span key={a} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{ACTIVITY_LABEL[a]}</span>
+                    ))}
+                    {(!e.activities || e.activities.length === 0) && <span className="text-[10px] text-muted-foreground">—</span>}
+                  </div>
+                </TableCell>
                 <TableCell><StatusBadge status={outcomeTone(e.outcome)} label={e.outcome.replace("_", " ")} /></TableCell>
                 <TableCell className="text-xs">
                   {e.productsUsed.length === 0 ? "—" : e.productsUsed.map((p) => `${p.productName} ×${p.quantity}`).join(", ")}
                 </TableCell>
-                <TableCell className="text-xs max-w-[240px] truncate">{e.notes}</TableCell>
+                <TableCell className="text-xs max-w-[320px] whitespace-pre-wrap">{e.notes}</TableCell>
               </TableRow>
             ))}
-            {entries.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-6">No field log entries yet.</TableCell></TableRow>
+            {sorted.length === 0 && (
+              <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-6">No field log entries yet.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
+        {sorted.length > pageSize && (
+          <div className="mt-3 flex justify-center">
+            <Button size="sm" variant="outline" onClick={() => setPageSize(pageSize + 10)}>
+              Load more ({sorted.length - pageSize} remaining)
+            </Button>
+          </div>
+        )}
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -613,6 +666,24 @@ function FieldLogTab({
                   <SelectItem value="NO_INTEREST">No interest</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="rounded-md border p-2">
+              <p className="text-xs font-semibold mb-2">Marketing activities</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(ACTIVITY_LABEL) as MarketingActivity[]).map((a) => {
+                  const on = (form.activities ?? []).includes(a);
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => toggleActivity(a)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition ${on ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-secondary"}`}
+                    >
+                      {ACTIVITY_LABEL[a]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="rounded-md border p-2 space-y-2">
               <p className="text-xs font-semibold">Promo stock used</p>
@@ -653,6 +724,20 @@ function outcomeTone(o: FieldLogEntry["outcome"]) {
   if (o === "SALE") return "green" as const;
   if (o === "NO_INTEREST") return "red" as const;
   return "yellow" as const;
+}
+
+function PromoStatusBadge({ status }: { status: NonNullable<PromoStockItem["requestStatus"]> }) {
+  const tone: Record<typeof status, string> = {
+    APPROVED: "bg-status-green/15 text-status-green ring-status-green/30",
+    DECLINED: "bg-status-red/15 text-status-red ring-status-red/30",
+    PENDING: "bg-status-yellow/25 text-status-yellow-foreground ring-status-yellow/40",
+  };
+  const label: Record<typeof status, string> = { APPROVED: "Approved", DECLINED: "Declined", PENDING: "Pending" };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${tone[status]}`}>
+      {label[status]}
+    </span>
+  );
 }
 
 // ===== 5. Requests & Authorisations =====
