@@ -282,6 +282,64 @@ const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
   },
 ];
 
+// ===== Regulatory & HR seed data =====
+function daysFromNow(d: number) { return new Date(Date.now() + d * 86400000).toISOString().slice(0, 10); }
+
+const SEED_LICENSES: License[] = [
+  { id: "LIC-1", type: "Wholesale Dealer's License", holder: "Cospharm (Pty) Ltd", issueDate: "2024-03-01", expiryDate: daysFromNow(120) },
+  { id: "LIC-2", type: "Qualified Person License", holder: "Tariro M. (QP)", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
+  { id: "LIC-3", type: "Import Permit", holder: "Shipment INV-7732", issueDate: daysFromNow(-15), expiryDate: daysFromNow(15) },
+  { id: "LIC-4", type: "Import Permit", holder: "Shipment INV-7741", issueDate: daysFromNow(-10), expiryDate: daysFromNow(80) },
+  { id: "LIC-5", type: "Export Permit", holder: "Shipment EXP-2210", issueDate: daysFromNow(-5), expiryDate: daysFromNow(-2) },
+  { id: "LIC-6", type: "Export Permit", holder: "Shipment EXP-2244", issueDate: daysFromNow(-1), expiryDate: daysFromNow(28) },
+];
+
+const SEED_ZONES: ColdChainZone[] = [
+  { id: "Z-1", name: "Cooler A — Vaccines", currentTempC: 4.1, targetRange: [2, 8], lastBreachAt: undefined, resolved: true },
+  { id: "Z-2", name: "Cooler B — Insulin", currentTempC: 6.5, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 9 * 86400000).toISOString(), breachDurationMins: 22, resolved: true },
+  { id: "Z-3", name: "Cooler C — Biologics", currentTempC: 9.2, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 2 * 3600000).toISOString(), breachDurationMins: 75, resolved: false },
+  { id: "Z-4", name: "Ambient Bay — Controlled", currentTempC: 22.0, targetRange: [15, 25], resolved: true },
+];
+
+const SEED_BATCHES: BatchRecord[] = [
+  { id: "B-1", batchNumber: "B-7741", product: "Paracetamol 500mg", expiry: daysFromNow(800), quantity: 1240, linkedDeliveryIds: ["D-1042", "D-1046"] },
+  { id: "B-2", batchNumber: "B-3320", product: "Amoxicillin 250mg", expiry: daysFromNow(120), quantity: 320, linkedDeliveryIds: ["D-1043"] },
+  { id: "B-3", batchNumber: "B-9011", product: "Insulin Glargine 100IU", expiry: daysFromNow(60), quantity: 28, linkedDeliveryIds: ["D-1044"] },
+  { id: "B-4", batchNumber: "B-2210", product: "Loratadine 10mg", expiry: daysFromNow(15), quantity: 12, linkedDeliveryIds: [] },
+  { id: "B-5", batchNumber: "B-8810", product: "ORS Sachets", expiry: daysFromNow(600), quantity: 540, linkedDeliveryIds: ["D-1048"] },
+];
+
+const SEED_CONTROLLED: ControlledDrugLog[] = [
+  { id: "CD-1", product: "Pethidine 50mg", batch: "B-PD-091", handler: "Tariro", action: "RECEIVED", timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
+  { id: "CD-2", product: "Morphine 10mg/ml", batch: "B-MP-244", handler: "Aman", action: "DISPENSED", timestamp: new Date(Date.now() - 3 * 3600000).toISOString() },
+  { id: "CD-3", product: "Diazepam 5mg", batch: "B-DZ-115", handler: "Alaska", action: "TRANSFERRED", timestamp: new Date(Date.now() - 1 * 3600000).toISOString() },
+];
+
+const SEED_INSPECTION: Inspection = {
+  lastDate: daysFromNow(-90),
+  nextDate: daysFromNow(10),
+  actions: [
+    { id: "CA-1", description: "Replace temperature logger in Cooler C", due: daysFromNow(-3), status: "OPEN" },
+    { id: "CA-2", description: "Update SOP for controlled drug transfers", due: daysFromNow(5), status: "OPEN" },
+    { id: "CA-3", description: "Renew QP delegation letter", due: daysFromNow(-20), status: "CLOSED" },
+  ],
+};
+
+const SEED_CERTS: StaffCertification[] = [
+  { id: "CR-1", staffName: "TT", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2023-01-10", expiryDate: daysFromNow(140) },
+  { id: "CR-2", staffName: "Phuso", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2024-05-01", expiryDate: daysFromNow(45) },
+  { id: "CR-3", staffName: "Tshepang", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", missing: true },
+  { id: "CR-4", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "COLD_CHAIN_HANDLING", issueDate: "2023-09-12", expiryDate: daysFromNow(200) },
+  { id: "CR-5", staffName: "Aman", staffRole: "Regulatory", type: "CONTROLLED_SUBSTANCES", issueDate: "2024-02-22", expiryDate: daysFromNow(20) },
+  { id: "CR-6", staffName: "Tariro", staffRole: "Regulatory", type: "QUALIFIED_PERSON", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
+  { id: "CR-7", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "FORKLIFT", issueDate: "2023-04-01", expiryDate: daysFromNow(330) },
+];
+
+const SEED_LEAVE: LeaveRecord[] = [
+  { id: "LV-1", staffName: "Tshepang", staffRole: "Driver", critical: true, from: daysFromNow(-1), to: daysFromNow(2), reason: "Sick leave" },
+  { id: "LV-2", staffName: "Sofia", staffRole: "Telesales", critical: false, from: daysFromNow(-2), to: daysFromNow(0), reason: "Annual leave" },
+];
+
 // ===== Component =====
 
 export function CospharmDashboard() {
