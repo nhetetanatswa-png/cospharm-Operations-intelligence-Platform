@@ -1016,10 +1016,23 @@ export function CospharmDashboard() {
           {/* ============ AUDIT ============ */}
           <TabsContent value="audit">
             <Tabs defaultValue="trail" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="trail">Audit trail</TabsTrigger>
-                <TabsTrigger value="digest">Notes digest</TabsTrigger>
-              </TabsList>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <TabsList>
+                  <TabsTrigger value="trail">Audit trail</TabsTrigger>
+                  <TabsTrigger value="digest">Notes digest</TabsTrigger>
+                </TabsList>
+                <WeeklyDigestButton
+                  deliveries={deliveries}
+                  tasks={tasks}
+                  stock={stock}
+                  audit={audit}
+                  comments={comments}
+                  alerts={alerts}
+                  calendarEvents={calendarEvents}
+                  authRequests={authRequests}
+                  fieldLog={fieldLog}
+                />
+              </div>
               <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
               <TabsContent value="digest">
                 <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
