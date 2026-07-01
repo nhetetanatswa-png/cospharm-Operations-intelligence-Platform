@@ -31,6 +31,7 @@ import { StatusBadge, StatusDot, type Status } from "./StatusBadge";
 import { TaskDetailSheet } from "./TaskDetailSheet";
 import { StockUpdateDialog } from "./StockUpdateDialog";
 import { AuditTrailCard } from "./AuditTrailCard";
+import { WeeklyDigestButton } from "./WeeklyDigest";
 import { DeliveryDetailSheet } from "./DeliveryDetailSheet";
 import { DeliveryProgress } from "./DeliveryProgress";
 import { CommentsBox } from "./CommentsBox";
