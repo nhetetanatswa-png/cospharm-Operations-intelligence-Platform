@@ -325,21 +325,6 @@ const SEED_INSPECTION: Inspection = {
   ],
 };
 
-const SEED_CERTS: StaffCertification[] = [
-  { id: "CR-1", staffName: "TT", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2023-01-10", expiryDate: daysFromNow(140) },
-  { id: "CR-2", staffName: "Phuso", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2024-05-01", expiryDate: daysFromNow(45) },
-  { id: "CR-3", staffName: "Tshepang", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", missing: true },
-  { id: "CR-4", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "COLD_CHAIN_HANDLING", issueDate: "2023-09-12", expiryDate: daysFromNow(200) },
-  { id: "CR-5", staffName: "Aman", staffRole: "Regulatory", type: "CONTROLLED_SUBSTANCES", issueDate: "2024-02-22", expiryDate: daysFromNow(20) },
-  { id: "CR-6", staffName: "Tariro", staffRole: "Regulatory", type: "QUALIFIED_PERSON", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
-  { id: "CR-7", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "FORKLIFT", issueDate: "2023-04-01", expiryDate: daysFromNow(330) },
-];
-
-const SEED_LEAVE: LeaveRecord[] = [
-  { id: "LV-1", staffName: "Tshepang", staffRole: "Driver", critical: true, from: daysFromNow(-1), to: daysFromNow(2), reason: "Sick leave" },
-  { id: "LV-2", staffName: "Sofia", staffRole: "Telesales", critical: false, from: daysFromNow(-2), to: daysFromNow(0), reason: "Annual leave" },
-];
-
 // ===== Component =====
 
 export function CospharmDashboard() {
