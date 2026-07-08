@@ -718,8 +718,8 @@ export function CospharmDashboard() {
             <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
               <Shield className="size-4" /> Regulatory
             </TabsTrigger>
-            <TabsTrigger value="hr" className="gap-1.5" disabled={!can(role, "hr.view")}>
-              <HeartHandshake className="size-4" /> HR
+            <TabsTrigger value="presence" className="gap-1.5">
+              <UserCheck className="size-4" /> Presence
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
