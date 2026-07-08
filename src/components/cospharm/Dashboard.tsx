@@ -1036,9 +1036,9 @@ export function CospharmDashboard() {
             />
           </TabsContent>
 
-          {/* ============ HR ============ */}
-          <TabsContent value="hr">
-            <HRModule certifications={SEED_CERTS} leave={SEED_LEAVE} licenses={SEED_LICENSES} />
+          {/* ============ PRESENCE & DELEGATION ============ */}
+          <TabsContent value="presence" className="space-y-4">
+            <PresenceBoard activeAssignments={activeAssignments} />
           </TabsContent>
 
           {/* ============ ADMIN ============ */}
