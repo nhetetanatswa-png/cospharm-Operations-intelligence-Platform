@@ -46,8 +46,9 @@ import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTOR
 import { NotesDigest } from "./NotesDigest";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { RegulatoryModule } from "./RegulatoryModule";
-import { HRModule } from "./HRModule";
-import { Shield, HeartHandshake } from "lucide-react";
+import { Shield, UserCheck } from "lucide-react";
+import { TimedDeliveries } from "./TimedDeliveries";
+import { PresenceBoard } from "./PresenceBoard";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -80,9 +81,7 @@ import type {
   ColdChainZone,
   ControlledDrugLog,
   Inspection,
-  LeaveRecord,
   License,
-  StaffCertification,
 } from "./types";
 import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
