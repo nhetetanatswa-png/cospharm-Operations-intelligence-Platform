@@ -348,6 +348,7 @@ export function CospharmDashboard() {
   const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
   const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
+  const [activeAssignments, setActiveAssignments] = useState<Record<string, string[]>>({});
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
