@@ -1,0 +1,333 @@
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatusBadge } from "./StatusBadge";
+import { Clock, Play, CheckCircle2, AlertTriangle, Timer, Truck, Trophy, User } from "lucide-react";
+import type { Delivery } from "./types";
+import {
+  STEP_TARGET_MINUTES,
+  STEP_DEPARTMENT,
+  loadTimings,
+  saveTimings,
+  stepRuntimeStatus,
+  deriveDeliveryUiStatus,
+  elapsedMinutes,
+  formatMinutes,
+  type DeliveryTimings,
+  type StepTiming,
+} from "./delivery-timing";
+import { OPERATION_STEPS } from "./operations";
+
+function useTick(intervalMs = 1000) {
+  const [, setT] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setT((n) => n + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+}
+
+export function TimedDeliveries({
+  deliveries,
+  currentUserName,
+  onOpenDelivery,
+  onActiveAssignmentsChange,
+}: {
+  deliveries: Delivery[];
+  currentUserName: string;
+  onOpenDelivery?: (id: string) => void;
+  onActiveAssignmentsChange?: (map: Record<string, string[]>) => void;
+}) {
+  useTick(1000);
+  const [timings, setTimings] = useState<DeliveryTimings>({});
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => { setTimings(loadTimings()); }, []);
+
+  function update(dId: string, step: number, patch: Partial<StepTiming>) {
+    setTimings((prev) => {
+      const next: DeliveryTimings = {
+        ...prev,
+        [dId]: { ...(prev[dId] ?? {}), [step]: { ...(prev[dId]?.[step] ?? {}), ...patch } },
+      };
+      saveTimings(next);
+      return next;
+    });
+  }
+
+  function startStep(dId: string, step: number) {
+    update(dId, step, { startTime: new Date().toISOString(), assignedPerson: currentUserName });
+  }
+
+  function completeStep(dId: string, step: number) {
+    // ensure it was started
+    setTimings((prev) => {
+      const cur = prev[dId]?.[step] ?? {};
+      const startTime = cur.startTime ?? new Date().toISOString();
+      const next: DeliveryTimings = {
+        ...prev,
+        [dId]: { ...(prev[dId] ?? {}), [step]: { ...cur, startTime, completionTime: new Date().toISOString() } },
+      };
+      saveTimings(next);
+      return next;
+    });
+  }
+
+  // Report active assignments upstream (name → list of "D-… step N")
+  useEffect(() => {
+    if (!onActiveAssignmentsChange) return;
+    const map: Record<string, string[]> = {};
+    for (const d of deliveries) {
+      const t = timings[d.id] ?? {};
+      for (let n = 1; n <= 7; n++) {
+        const s = t[n];
+        if (s?.startTime && !s.completionTime && s.assignedPerson) {
+          (map[s.assignedPerson] ??= []).push(`${d.id} step ${n}`);
+        }
+      }
+    }
+    onActiveAssignmentsChange(map);
+  }, [timings, deliveries, onActiveAssignmentsChange]);
+
+  const filtered = useMemo(() => deliveries.filter((d) =>
+    [d.id, d.customerName, d.assignedOps, d.assignedMarketer].join(" ").toLowerCase().includes(filter.toLowerCase()),
+  ), [deliveries, filter]);
+
+  // ===== Aggregated analytics =====
+  const analytics = useMemo(() => {
+    const perStep: Record<number, number[]> = {};
+    const perStaff: Record<string, { done: number; delayed: number; totalMin: number }> = {};
+    let cycleTimes: number[] = [];
+    let delayedDeliveries = 0;
+    let totalWithData = 0;
+    const stepDelayCount: Record<number, number> = {};
+
+    for (const d of deliveries) {
+      const t = timings[d.id] ?? {};
+      let hasAny = false;
+      let anyDelayed = false;
+      const firstStart = t[1]?.startTime;
+      const lastEnd = t[7]?.completionTime;
+
+      for (let n = 1; n <= 7; n++) {
+        const s = t[n];
+        if (!s?.startTime) continue;
+        hasAny = true;
+        const actual = elapsedMinutes(s.startTime, s.completionTime);
+        const rs = stepRuntimeStatus({ stepNumber: n }, s);
+        if (s.completionTime) (perStep[n] ??= []).push(actual);
+        if (rs.delayed) {
+          anyDelayed = true;
+          stepDelayCount[n] = (stepDelayCount[n] ?? 0) + 1;
+        }
+        if (s.assignedPerson) {
+          const rec = (perStaff[s.assignedPerson] ??= { done: 0, delayed: 0, totalMin: 0 });
+          if (s.completionTime) { rec.done += 1; rec.totalMin += actual; }
+          if (rs.delayed) rec.delayed += 1;
+        }
+      }
+      if (hasAny) totalWithData += 1;
+      if (anyDelayed) delayedDeliveries += 1;
+      if (firstStart && lastEnd) cycleTimes.push(elapsedMinutes(firstStart, lastEnd));
+    }
+
+    const avgPerStep: Record<number, number> = {};
+    for (const [k, arr] of Object.entries(perStep)) {
+      avgPerStep[Number(k)] = arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+    const stepEntries = Object.entries(avgPerStep).map(([k, v]) => ({ step: Number(k), avg: v }));
+    stepEntries.sort((a, b) => a.avg - b.avg);
+    const fastest = stepEntries[0];
+    const slowest = stepEntries[stepEntries.length - 1];
+    const mostDelayedStep = Object.entries(stepDelayCount).sort((a, b) => b[1] - a[1])[0];
+    const avgCycle = cycleTimes.length ? cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length : undefined;
+    const delayedPct = totalWithData ? Math.round((delayedDeliveries / totalWithData) * 100) : 0;
+
+    return { avgPerStep, avgCycle, fastest, slowest, mostDelayedStep, delayedDeliveries, delayedPct, perStaff };
+  }, [deliveries, timings]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const c = { Pending: 0, "Awaiting Dispatch": 0, Dispatched: 0, Completed: 0, Delayed: 0 };
+    for (const d of deliveries) {
+      const s = deriveDeliveryUiStatus(timings[d.id]);
+      c[s.label] += 1;
+      if (s.delayed) c.Delayed += 1;
+    }
+    return c;
+  }, [deliveries, timings]);
+
+  return (
+    <div className="space-y-5">
+      {/* KPI cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Kpi icon={<Clock className="size-4" />} label="Pending" value={statusCounts.Pending} tone="yellow" />
+        <Kpi icon={<Truck className="size-4" />} label="Awaiting dispatch" value={statusCounts["Awaiting Dispatch"]} tone="orange" />
+        <Kpi icon={<Truck className="size-4" />} label="Dispatched" value={statusCounts.Dispatched} tone="blue" />
+        <Kpi icon={<CheckCircle2 className="size-4" />} label="Completed" value={statusCounts.Completed} tone="green" />
+        <Kpi icon={<AlertTriangle className="size-4" />} label="Delayed" value={statusCounts.Delayed} tone="red" />
+      </div>
+
+      {/* Analytics row */}
+      <div className="grid gap-3 md:grid-cols-4">
+        <Kpi icon={<Timer className="size-4" />} label="Avg cycle time" value={formatMinutes(analytics.avgCycle)} tone="blue" />
+        <Kpi icon={<Trophy className="size-4" />} label="Fastest step" value={analytics.fastest ? `#${analytics.fastest.step} · ${formatMinutes(analytics.fastest.avg)}` : "—"} tone="green" />
+        <Kpi icon={<AlertTriangle className="size-4" />} label="Slowest step" value={analytics.slowest ? `#${analytics.slowest.step} · ${formatMinutes(analytics.slowest.avg)}` : "—"} tone="orange" />
+        <Kpi icon={<AlertTriangle className="size-4" />} label="Delayed deliveries" value={`${analytics.delayedDeliveries} · ${analytics.delayedPct}%`} tone="red" />
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base font-semibold">Live delivery workflow · 7 timed steps</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each step has a target time. Start and complete steps to record actual times. Timers tick live and persist across refresh.
+            </p>
+          </div>
+          <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by ID, customer, staff…" className="max-w-xs" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {filtered.map((d) => {
+            const t = timings[d.id] ?? {};
+            const ui = deriveDeliveryUiStatus(t);
+            const badgeTone = ui.label === "Completed" ? "green" : ui.label === "Dispatched" ? "yellow" : ui.label === "Awaiting Dispatch" ? "yellow" : "yellow";
+            return (
+              <div key={d.id} className={`rounded-md border p-4 ${ui.delayed ? "border-status-red" : ""}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button className="text-left" onClick={() => onOpenDelivery?.(d.id)}>
+                    <p className="font-mono text-[11px] text-muted-foreground">{d.id} · due {d.dueDate}</p>
+                    <p className="text-sm font-semibold">{d.customerName}</p>
+                    <p className="text-[11px] text-muted-foreground">Marketer {d.assignedMarketer} · Ops {d.assignedOps}</p>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {ui.delayed ? <StatusBadge status="red" label="Delayed" /> : null}
+                    <StatusBadge status={badgeTone as "green" | "yellow" | "red"} label={ui.label} />
+                  </div>
+                </div>
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[36px]">#</TableHead>
+                        <TableHead>Step</TableHead>
+                        <TableHead>Dept</TableHead>
+                        <TableHead>Assigned</TableHead>
+                        <TableHead className="text-right">Target</TableHead>
+                        <TableHead className="text-right">Actual</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {OPERATION_STEPS.map((step) => {
+                        const s = t[step.stepNumber];
+                        const rs = stepRuntimeStatus(step, s);
+                        const prev = t[step.stepNumber - 1];
+                        const prevDone = step.stepNumber === 1 || Boolean(prev?.completionTime);
+                        const rowTone = rs.delayed ? "bg-status-red/5" : rs.status === "COMPLETED" ? "bg-status-green/5" : rs.status === "IN_PROGRESS" ? "bg-blue-500/5" : "";
+                        return (
+                          <TableRow key={step.stepNumber} className={rowTone}>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{step.stepNumber}</TableCell>
+                            <TableCell className="text-sm">{step.name}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{STEP_DEPARTMENT[step.stepNumber]}</TableCell>
+                            <TableCell className="text-xs">
+                              {s?.assignedPerson ? <span className="inline-flex items-center gap-1"><User className="size-3" />{s.assignedPerson}</span> : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-xs">{STEP_TARGET_MINUTES[step.stepNumber]}m</TableCell>
+                            <TableCell className="text-right text-xs font-mono">
+                              {rs.status === "NOT_STARTED" ? "—" : formatMinutes(rs.actualMinutes)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {rs.status === "NOT_STARTED" ? <StatusBadge status="yellow" label="Not started" />
+                                : rs.status === "IN_PROGRESS" ? <StatusBadge status="yellow" label="In progress" />
+                                : rs.status === "DELAYED" ? <StatusBadge status="red" label="Delayed" />
+                                : <StatusBadge status="green" label="Completed" />}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {!s?.startTime && prevDone ? (
+                                <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => startStep(d.id, step.stepNumber)}>
+                                  <Play className="size-3" /> Start
+                                </Button>
+                              ) : s?.startTime && !s?.completionTime ? (
+                                <Button size="sm" className="h-7 gap-1 text-[11px]" onClick={() => completeStep(d.id, step.stepNumber)}>
+                                  <CheckCircle2 className="size-3" /> Complete
+                                </Button>
+                              ) : s?.completionTime ? (
+                                <span className="text-[11px] text-muted-foreground">Done</span>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">Waiting</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 ? (
+            <p className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">No deliveries match this filter.</p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Staff leaderboard */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2"><Trophy className="size-4" /> Staff accountability leaderboard</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Staff</TableHead>
+                <TableHead className="text-right">Steps completed</TableHead>
+                <TableHead className="text-right">Delayed</TableHead>
+                <TableHead className="text-right">Avg time / step</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(analytics.perStaff).sort((a, b) => b[1].done - a[1].done).map(([name, r]) => (
+                <TableRow key={name}>
+                  <TableCell className="font-medium text-sm">{name}</TableCell>
+                  <TableCell className="text-right text-sm">{r.done}</TableCell>
+                  <TableCell className="text-right text-sm">
+                    {r.delayed > 0 ? <StatusBadge status="red" label={String(r.delayed)} /> : <span className="text-muted-foreground">0</span>}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-mono">{r.done ? formatMinutes(r.totalMin / r.done) : "—"}</TableCell>
+                </TableRow>
+              ))}
+              {Object.keys(analytics.perStaff).length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground">No timing data recorded yet — start a step above.</TableCell></TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Kpi({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string | number; tone: "green" | "yellow" | "red" | "orange" | "blue" }) {
+  const tones: Record<string, string> = {
+    green: "bg-status-green/15 text-status-green",
+    yellow: "bg-status-yellow/20 text-status-yellow-foreground",
+    red: "bg-status-red/15 text-status-red",
+    orange: "bg-orange-500/15 text-orange-600",
+    blue: "bg-blue-500/15 text-blue-600",
+  };
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-3 p-4">
+        <div className={`grid size-9 place-items-center rounded-md ${tones[tone]}`}>{icon}</div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mt-0.5 text-lg font-semibold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

@@ -88,6 +88,15 @@ export type OperationStep = {
   completedBy?: string;
   completedAt?: string;
   comment?: string;
+  assignedPerson?: string;
+  department?: string;
+  startTime?: string;
+  completionTime?: string;
+  targetMinutes?: number;
+  actualMinutes?: number;
+  delayed?: boolean;
+  delayReason?: string;
+  handoffToNextPerson?: string;
 };
 
 export type Delivery = {

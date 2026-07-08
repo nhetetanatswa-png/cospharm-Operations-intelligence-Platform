@@ -46,8 +46,9 @@ import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTOR
 import { NotesDigest } from "./NotesDigest";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { RegulatoryModule } from "./RegulatoryModule";
-import { HRModule } from "./HRModule";
-import { Shield, HeartHandshake } from "lucide-react";
+import { Shield, UserCheck } from "lucide-react";
+import { TimedDeliveries } from "./TimedDeliveries";
+import { PresenceBoard } from "./PresenceBoard";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -80,9 +81,7 @@ import type {
   ColdChainZone,
   ControlledDrugLog,
   Inspection,
-  LeaveRecord,
   License,
-  StaffCertification,
 } from "./types";
 import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
@@ -326,21 +325,6 @@ const SEED_INSPECTION: Inspection = {
   ],
 };
 
-const SEED_CERTS: StaffCertification[] = [
-  { id: "CR-1", staffName: "TT", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2023-01-10", expiryDate: daysFromNow(140) },
-  { id: "CR-2", staffName: "Phuso", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2024-05-01", expiryDate: daysFromNow(45) },
-  { id: "CR-3", staffName: "Tshepang", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", missing: true },
-  { id: "CR-4", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "COLD_CHAIN_HANDLING", issueDate: "2023-09-12", expiryDate: daysFromNow(200) },
-  { id: "CR-5", staffName: "Aman", staffRole: "Regulatory", type: "CONTROLLED_SUBSTANCES", issueDate: "2024-02-22", expiryDate: daysFromNow(20) },
-  { id: "CR-6", staffName: "Tariro", staffRole: "Regulatory", type: "QUALIFIED_PERSON", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
-  { id: "CR-7", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "FORKLIFT", issueDate: "2023-04-01", expiryDate: daysFromNow(330) },
-];
-
-const SEED_LEAVE: LeaveRecord[] = [
-  { id: "LV-1", staffName: "Tshepang", staffRole: "Driver", critical: true, from: daysFromNow(-1), to: daysFromNow(2), reason: "Sick leave" },
-  { id: "LV-2", staffName: "Sofia", staffRole: "Telesales", critical: false, from: daysFromNow(-2), to: daysFromNow(0), reason: "Annual leave" },
-];
-
 // ===== Component =====
 
 export function CospharmDashboard() {
@@ -364,6 +348,7 @@ export function CospharmDashboard() {
   const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
   const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
+  const [activeAssignments, setActiveAssignments] = useState<Record<string, string[]>>({});
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
@@ -734,8 +719,8 @@ export function CospharmDashboard() {
             <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
               <Shield className="size-4" /> Regulatory
             </TabsTrigger>
-            <TabsTrigger value="hr" className="gap-1.5" disabled={!can(role, "hr.view")}>
-              <HeartHandshake className="size-4" /> HR
+            <TabsTrigger value="presence" className="gap-1.5">
+              <UserCheck className="size-4" /> Presence
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
             <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
@@ -812,59 +797,12 @@ export function CospharmDashboard() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="active" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Active deliveries · 7-step workflow</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Each delivery follows a strict chain of command. Users can only complete the steps allowed for their role; later steps require earlier ones.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {deliveriesWithRisk.map(({ d, risk }) => {
-                  const badge = deliveryStatusBadge(d.status);
-                  const w = d.dispatchWindow ?? "AFTERNOON";
-                  const winInfo = DISPATCH_WINDOW_LABELS[w];
-                  const isLate = d.status === "LATE";
-                  const needsDelayReason = isLate && !d.delayReason;
-                  return (
-                    <div
-                      key={d.id}
-                      className={`rounded-md border bg-card p-4 transition ${needsDelayReason ? "border-status-red animate-pulse" : isLate ? "border-status-red" : ""}`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <button onClick={() => setOpenDeliveryId(d.id)} className="text-left">
-                          <p className="font-mono text-xs text-muted-foreground">{d.id} · due {d.dueDate}</p>
-                          <p className="font-medium">{d.customerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Marketer {d.assignedMarketer} · Ops {d.assignedOps}
-                          </p>
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${winInfo.badge}`}>
-                            {winInfo.emoji} {winInfo.label}
-                          </span>
-                          {risk.risk !== "READY" ? <StatusBadge status={risk.risk === "BLOCKED" ? "red" : "yellow"} label={risk.risk === "BLOCKED" ? "Blocked" : "At risk"} /> : null}
-                          <StatusBadge status={badge.tone} label={badge.label} />
-                          {needsDelayReason ? (
-                            <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setDelayDialog(d); }}>
-                              Add delay reason
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="mt-3">
-                        <DeliveryProgress steps={d.steps} />
-                      </div>
-                      {isLate && d.delayReason ? (
-                        <p className="mt-2 rounded bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
-                          Delay reason on record · {d.responsibleDept ?? ""} · {d.delayReason}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                <TimedDeliveries
+                  deliveries={deliveries}
+                  currentUserName={currentUser.name}
+                  onOpenDelivery={setOpenDeliveryId}
+                  onActiveAssignmentsChange={setActiveAssignments}
+                />
               </TabsContent>
               <TabsContent value="emergency" className="mt-4">
                 <EmergencyOrders
@@ -1052,9 +990,9 @@ export function CospharmDashboard() {
             />
           </TabsContent>
 
-          {/* ============ HR ============ */}
-          <TabsContent value="hr">
-            <HRModule certifications={SEED_CERTS} leave={SEED_LEAVE} licenses={SEED_LICENSES} />
+          {/* ============ PRESENCE & DELEGATION ============ */}
+          <TabsContent value="presence" className="space-y-4">
+            <PresenceBoard activeAssignments={activeAssignments} />
           </TabsContent>
 
           {/* ============ ADMIN ============ */}
