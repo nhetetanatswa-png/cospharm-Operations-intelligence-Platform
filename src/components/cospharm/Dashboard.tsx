@@ -797,59 +797,12 @@ export function CospharmDashboard() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="active" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Active deliveries · 7-step workflow</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Each delivery follows a strict chain of command. Users can only complete the steps allowed for their role; later steps require earlier ones.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {deliveriesWithRisk.map(({ d, risk }) => {
-                  const badge = deliveryStatusBadge(d.status);
-                  const w = d.dispatchWindow ?? "AFTERNOON";
-                  const winInfo = DISPATCH_WINDOW_LABELS[w];
-                  const isLate = d.status === "LATE";
-                  const needsDelayReason = isLate && !d.delayReason;
-                  return (
-                    <div
-                      key={d.id}
-                      className={`rounded-md border bg-card p-4 transition ${needsDelayReason ? "border-status-red animate-pulse" : isLate ? "border-status-red" : ""}`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <button onClick={() => setOpenDeliveryId(d.id)} className="text-left">
-                          <p className="font-mono text-xs text-muted-foreground">{d.id} · due {d.dueDate}</p>
-                          <p className="font-medium">{d.customerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Marketer {d.assignedMarketer} · Ops {d.assignedOps}
-                          </p>
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${winInfo.badge}`}>
-                            {winInfo.emoji} {winInfo.label}
-                          </span>
-                          {risk.risk !== "READY" ? <StatusBadge status={risk.risk === "BLOCKED" ? "red" : "yellow"} label={risk.risk === "BLOCKED" ? "Blocked" : "At risk"} /> : null}
-                          <StatusBadge status={badge.tone} label={badge.label} />
-                          {needsDelayReason ? (
-                            <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setDelayDialog(d); }}>
-                              Add delay reason
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="mt-3">
-                        <DeliveryProgress steps={d.steps} />
-                      </div>
-                      {isLate && d.delayReason ? (
-                        <p className="mt-2 rounded bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
-                          Delay reason on record · {d.responsibleDept ?? ""} · {d.delayReason}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                <TimedDeliveries
+                  deliveries={deliveries}
+                  currentUserName={currentUser.name}
+                  onOpenDelivery={setOpenDeliveryId}
+                  onActiveAssignmentsChange={setActiveAssignments}
+                />
               </TabsContent>
               <TabsContent value="emergency" className="mt-4">
                 <EmergencyOrders
