@@ -27,9 +27,9 @@ function TrafficDot({ light, size = "sm" }: { light: TrafficLight; size?: "sm" |
   const dim = size === "lg" ? "size-3.5" : "size-2.5";
   const tone: Record<TrafficLight, string> = {
     idle: "bg-muted-foreground/30",
-    green: "bg-status-green shadow-[0_0_0_3px_hsl(var(--status-green)/0.18)]",
-    yellow: "bg-status-yellow shadow-[0_0_0_3px_hsl(var(--status-yellow)/0.25)]",
-    red: "bg-status-red shadow-[0_0_0_3px_hsl(var(--status-red)/0.25)] animate-pulse",
+    green: "bg-status-green ring-2 ring-status-green/30",
+    yellow: "bg-status-yellow ring-2 ring-status-yellow/40",
+    red: "bg-status-red ring-2 ring-status-red/40 animate-pulse",
   };
   return <span className={`inline-block rounded-full ${dim} ${tone[light]}`} aria-label={`Status: ${light}`} />;
 }
@@ -47,9 +47,9 @@ function TrafficStack({ light }: { light: TrafficLight }) {
     `size-2 rounded-full ${active ? cls : "bg-muted-foreground/15"} ${active && light === "red" ? "animate-pulse" : ""}`;
   return (
     <span className="inline-flex flex-col items-center gap-0.5 rounded-sm bg-foreground/5 px-1 py-1 ring-1 ring-border">
-      <span className={lamp(s.r, "bg-status-red shadow-[0_0_6px_hsl(var(--status-red)/0.9)]")} />
-      <span className={lamp(s.y, "bg-status-yellow shadow-[0_0_6px_hsl(var(--status-yellow)/0.9)]")} />
-      <span className={lamp(s.g, "bg-status-green shadow-[0_0_6px_hsl(var(--status-green)/0.9)]")} />
+      <span className={lamp(s.r, "bg-status-red ring-1 ring-status-red/60")} />
+      <span className={lamp(s.y, "bg-status-yellow ring-1 ring-status-yellow/60")} />
+      <span className={lamp(s.g, "bg-status-green ring-1 ring-status-green/60")} />
     </span>
   );
 }
