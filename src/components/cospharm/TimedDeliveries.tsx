@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
-import { Clock, Play, CheckCircle2, AlertTriangle, Timer, Truck, Trophy, User } from "lucide-react";
+import { Clock, Play, CheckCircle2, AlertTriangle, Timer, Truck, Trophy, User, Zap, Menu } from "lucide-react";
 import type { Delivery } from "./types";
 import {
   STEP_TARGET_MINUTES,
@@ -100,8 +100,20 @@ export function TimedDeliveries({
   useTick(1000);
   const [timings, setTimings] = useState<DeliveryTimings>({});
   const [filter, setFilter] = useState("");
+  const [view, setView] = useState<"risk" | "workflow">("workflow");
 
   useEffect(() => { setTimings(loadTimings()); }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem("cospharm_deliveries_view");
+    if (saved === "risk" || saved === "workflow") setView(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem("cospharm_deliveries_view", view); } catch { /* ignore */ }
+  }, [view]);
 
   function update(dId: string, step: number, patch: Partial<StepTiming>) {
     setTimings((prev) => {
@@ -218,6 +230,24 @@ export function TimedDeliveries({
 
   return (
     <div className="space-y-5">
+      {/* View toggle */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex rounded-md border bg-card p-0.5">
+          <button
+            onClick={() => setView("risk")}
+            className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition ${view === "risk" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Zap className="size-3.5" /> Risk Panel
+          </button>
+          <button
+            onClick={() => setView("workflow")}
+            className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition ${view === "workflow" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Menu className="size-3.5" /> Step Workflow
+          </button>
+        </div>
+      </div>
+
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi icon={<Clock className="size-4" />} label="Pending" value={statusCounts.Pending} tone="yellow" />
@@ -235,6 +265,60 @@ export function TimedDeliveries({
         <Kpi icon={<AlertTriangle className="size-4" />} label="Delayed deliveries" value={`${analytics.delayedDeliveries} · ${analytics.delayedPct}%`} tone="red" />
       </div>
 
+      {view === "risk" ? (
+        <Card>
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold">Delivery risk panel</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">One card per delivery. Click to open the full detail view.</p>
+            </div>
+            <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by ID, customer, staff…" className="max-w-xs" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((d) => {
+                const t = timings[d.id] ?? {};
+                const ui = deriveDeliveryUiStatus(t);
+                const light = deliveryTrafficLight(t);
+                let completed = 0;
+                for (let n = 1; n <= 7; n++) if (t[n]?.completionTime) completed += 1;
+                const pct = Math.round((completed / 7) * 100);
+                const barTone = light === "red" ? "bg-status-red" : light === "yellow" ? "bg-status-yellow" : light === "green" ? "bg-status-green" : "bg-muted-foreground/40";
+                const badgeTone = ui.label === "Completed" ? "green" : "yellow";
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => onOpenDelivery?.(d.id)}
+                    className={`text-left rounded-md border bg-card p-4 transition hover:border-primary hover:shadow-sm ${ui.delayed ? "border-status-red" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[11px] text-muted-foreground">{d.id}</p>
+                        <p className="truncate text-sm font-semibold">{d.customerName}</p>
+                      </div>
+                      <TrafficStack light={light} />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>Steps {completed}/7</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div className={`h-full ${barTone}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      {ui.delayed ? <StatusBadge status="red" label="Delayed" /> : null}
+                      <StatusBadge status={badgeTone as "green" | "yellow" | "red"} label={ui.label} />
+                    </div>
+                  </button>
+                );
+              })}
+              {filtered.length === 0 ? (
+                <p className="col-span-full rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">No deliveries match this filter.</p>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -347,6 +431,7 @@ export function TimedDeliveries({
           ) : null}
         </CardContent>
       </Card>
+      )}
 
       {/* Staff leaderboard */}
       <Card>
