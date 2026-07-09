@@ -52,6 +52,45 @@ export function elapsedMinutes(startIso: string, endIso?: string): number {
 
 export type StepRuntimeStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "DELAYED";
 
+/** Traffic-light colour blended from the live timer vs its target. */
+export type TrafficLight = "idle" | "green" | "yellow" | "red";
+
+export function trafficLightFor(
+  status: StepRuntimeStatus,
+  actualMinutes: number | undefined,
+  target: number,
+): TrafficLight {
+  if (status === "NOT_STARTED") return "idle";
+  const ratio = (actualMinutes ?? 0) / Math.max(1, target);
+  if (status === "COMPLETED") return ratio <= 1 ? "green" : "red";
+  if (status === "DELAYED") return "red";
+  // IN_PROGRESS
+  if (ratio < 0.7) return "green";
+  if (ratio < 1) return "yellow";
+  return "red";
+}
+
+/** Composite traffic light for a whole delivery: red if any step red,
+ * else yellow if any step yellow / any pending step past its window,
+ * else green if any progress recorded, else idle. */
+export function deliveryTrafficLight(
+  timings: Record<number, StepTiming> | undefined,
+): TrafficLight {
+  const t = timings ?? {};
+  let seen = false;
+  let worst: TrafficLight = "idle";
+  const order: TrafficLight[] = ["idle", "green", "yellow", "red"];
+  for (let n = 1; n <= 7; n++) {
+    const s = t[n];
+    if (!s?.startTime && !s?.completionTime) continue;
+    seen = true;
+    const rs = stepRuntimeStatus({ stepNumber: n }, s);
+    const light = trafficLightFor(rs.status, rs.actualMinutes, rs.target);
+    if (order.indexOf(light) > order.indexOf(worst)) worst = light;
+  }
+  return seen ? worst : "idle";
+}
+
 export function stepRuntimeStatus(step: { stepNumber: number }, timing?: StepTiming): {
   status: StepRuntimeStatus;
   actualMinutes?: number;
