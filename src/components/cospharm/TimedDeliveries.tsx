@@ -15,10 +15,68 @@ import {
   deriveDeliveryUiStatus,
   elapsedMinutes,
   formatMinutes,
+  trafficLightFor,
+  deliveryTrafficLight,
+  type TrafficLight,
   type DeliveryTimings,
   type StepTiming,
 } from "./delivery-timing";
 import { OPERATION_STEPS } from "./operations";
+
+function TrafficDot({ light, size = "sm" }: { light: TrafficLight; size?: "sm" | "lg" }) {
+  const dim = size === "lg" ? "size-3.5" : "size-2.5";
+  const tone: Record<TrafficLight, string> = {
+    idle: "bg-muted-foreground/30",
+    green: "bg-status-green shadow-[0_0_0_3px_hsl(var(--status-green)/0.18)]",
+    yellow: "bg-status-yellow shadow-[0_0_0_3px_hsl(var(--status-yellow)/0.25)]",
+    red: "bg-status-red shadow-[0_0_0_3px_hsl(var(--status-red)/0.25)] animate-pulse",
+  };
+  return <span className={`inline-block rounded-full ${dim} ${tone[light]}`} aria-label={`Status: ${light}`} />;
+}
+
+function TrafficStack({ light }: { light: TrafficLight }) {
+  // Vertical 3-lamp signal — always shows all three; the active lamp is bright.
+  const on: Record<TrafficLight, { r: boolean; y: boolean; g: boolean }> = {
+    idle:   { r: false, y: false, g: false },
+    green:  { r: false, y: false, g: true  },
+    yellow: { r: false, y: true,  g: false },
+    red:    { r: true,  y: false, g: false },
+  };
+  const s = on[light];
+  const lamp = (active: boolean, cls: string) =>
+    `size-2 rounded-full ${active ? cls : "bg-muted-foreground/15"} ${active && light === "red" ? "animate-pulse" : ""}`;
+  return (
+    <span className="inline-flex flex-col items-center gap-0.5 rounded-sm bg-foreground/5 px-1 py-1 ring-1 ring-border">
+      <span className={lamp(s.r, "bg-status-red shadow-[0_0_6px_hsl(var(--status-red)/0.9)]")} />
+      <span className={lamp(s.y, "bg-status-yellow shadow-[0_0_6px_hsl(var(--status-yellow)/0.9)]")} />
+      <span className={lamp(s.g, "bg-status-green shadow-[0_0_6px_hsl(var(--status-green)/0.9)]")} />
+    </span>
+  );
+}
+
+function TimerBar({
+  status,
+  actual,
+  target,
+}: {
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "DELAYED";
+  actual: number | undefined;
+  target: number;
+}) {
+  if (status === "NOT_STARTED") return null;
+  const pct = Math.min(100, ((actual ?? 0) / Math.max(1, target)) * 100);
+  const over = (actual ?? 0) > target;
+  const overPct = over ? Math.min(100, (((actual ?? 0) - target) / target) * 100) : 0;
+  const light = trafficLightFor(status, actual, target);
+  const tone =
+    light === "green" ? "bg-status-green" : light === "yellow" ? "bg-status-yellow" : light === "red" ? "bg-status-red" : "bg-muted-foreground/40";
+  return (
+    <div className="mt-1 h-1 w-24 overflow-hidden rounded-full bg-muted">
+      <div className={`h-full ${tone} ${over ? "animate-pulse" : ""}`} style={{ width: `${over ? 100 : pct}%` }} />
+      {over ? <div className="-mt-1 h-1 rounded-full bg-status-red/60" style={{ width: `${overPct}%` }} /> : null}
+    </div>
+  );
+}
 
 function useTick(intervalMs = 1000) {
   const [, setT] = useState(0);
@@ -192,13 +250,17 @@ export function TimedDeliveries({
             const t = timings[d.id] ?? {};
             const ui = deriveDeliveryUiStatus(t);
             const badgeTone = ui.label === "Completed" ? "green" : ui.label === "Dispatched" ? "yellow" : ui.label === "Awaiting Dispatch" ? "yellow" : "yellow";
+            const deliveryLight = deliveryTrafficLight(t);
             return (
               <div key={d.id} className={`rounded-md border p-4 ${ui.delayed ? "border-status-red" : ""}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <button className="text-left" onClick={() => onOpenDelivery?.(d.id)}>
-                    <p className="font-mono text-[11px] text-muted-foreground">{d.id} · due {d.dueDate}</p>
-                    <p className="text-sm font-semibold">{d.customerName}</p>
-                    <p className="text-[11px] text-muted-foreground">Marketer {d.assignedMarketer} · Ops {d.assignedOps}</p>
+                  <button className="flex items-center gap-3 text-left" onClick={() => onOpenDelivery?.(d.id)}>
+                    <TrafficStack light={deliveryLight} />
+                    <div>
+                      <p className="font-mono text-[11px] text-muted-foreground">{d.id} · due {d.dueDate}</p>
+                      <p className="text-sm font-semibold">{d.customerName}</p>
+                      <p className="text-[11px] text-muted-foreground">Marketer {d.assignedMarketer} · Ops {d.assignedOps}</p>
+                    </div>
                   </button>
                   <div className="flex items-center gap-2">
                     {ui.delayed ? <StatusBadge status="red" label="Delayed" /> : null}
@@ -209,7 +271,7 @@ export function TimedDeliveries({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[36px]">#</TableHead>
+                        <TableHead className="w-[48px]">#</TableHead>
                         <TableHead>Step</TableHead>
                         <TableHead>Dept</TableHead>
                         <TableHead>Assigned</TableHead>
@@ -226,9 +288,15 @@ export function TimedDeliveries({
                         const prev = t[step.stepNumber - 1];
                         const prevDone = step.stepNumber === 1 || Boolean(prev?.completionTime);
                         const rowTone = rs.delayed ? "bg-status-red/5" : rs.status === "COMPLETED" ? "bg-status-green/5" : rs.status === "IN_PROGRESS" ? "bg-blue-500/5" : "";
+                        const light = trafficLightFor(rs.status, rs.actualMinutes, rs.target);
                         return (
                           <TableRow key={step.stepNumber} className={rowTone}>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{step.stepNumber}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <TrafficDot light={light} />
+                                {step.stepNumber}
+                              </span>
+                            </TableCell>
                             <TableCell className="text-sm">{step.name}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{STEP_DEPARTMENT[step.stepNumber]}</TableCell>
                             <TableCell className="text-xs">
@@ -236,13 +304,19 @@ export function TimedDeliveries({
                             </TableCell>
                             <TableCell className="text-right text-xs">{STEP_TARGET_MINUTES[step.stepNumber]}m</TableCell>
                             <TableCell className="text-right text-xs font-mono">
-                              {rs.status === "NOT_STARTED" ? "—" : formatMinutes(rs.actualMinutes)}
+                              <div className="flex flex-col items-end">
+                                <span>{rs.status === "NOT_STARTED" ? "—" : formatMinutes(rs.actualMinutes)}</span>
+                                <TimerBar status={rs.status} actual={rs.actualMinutes} target={rs.target} />
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {rs.status === "NOT_STARTED" ? <StatusBadge status="yellow" label="Not started" />
-                                : rs.status === "IN_PROGRESS" ? <StatusBadge status="yellow" label="In progress" />
-                                : rs.status === "DELAYED" ? <StatusBadge status="red" label="Delayed" />
-                                : <StatusBadge status="green" label="Completed" />}
+                              <div className="inline-flex items-center gap-2">
+                                <TrafficDot light={light} size="lg" />
+                                {rs.status === "NOT_STARTED" ? <StatusBadge status="yellow" label="Not started" />
+                                  : rs.status === "IN_PROGRESS" ? <StatusBadge status={light === "red" ? "red" : light === "yellow" ? "yellow" : "green"} label={light === "red" ? "Over target" : light === "yellow" ? "Nearing target" : "On track"} />
+                                  : rs.status === "DELAYED" ? <StatusBadge status="red" label="Delayed" />
+                                  : <StatusBadge status={light === "red" ? "red" : "green"} label={light === "red" ? "Completed late" : "Completed"} />}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               {!s?.startTime && prevDone ? (
