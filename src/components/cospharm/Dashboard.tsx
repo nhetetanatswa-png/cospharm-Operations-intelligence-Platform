@@ -44,6 +44,7 @@ import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import { ROLE_USERS_FULL, STAFF_ROSTER } from "./staff";
 import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTORS } from "./mockClients";
 import { NotesDigest } from "./NotesDigest";
+import { PerformanceReport } from "./PerformanceReport";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { RegulatoryModule } from "./RegulatoryModule";
 import { Shield, UserCheck } from "lucide-react";
@@ -957,6 +958,7 @@ export function CospharmDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <TabsList>
                   <TabsTrigger value="trail">Audit trail</TabsTrigger>
+                  <TabsTrigger value="performance">Performance report</TabsTrigger>
                   <TabsTrigger value="digest">Notes digest</TabsTrigger>
                 </TabsList>
                 <WeeklyDigestButton
@@ -972,6 +974,9 @@ export function CospharmDashboard() {
                 />
               </div>
               <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
+              <TabsContent value="performance">
+                <PerformanceReport deliveries={deliveries} audit={audit} />
+              </TabsContent>
               <TabsContent value="digest">
                 <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
               </TabsContent>
