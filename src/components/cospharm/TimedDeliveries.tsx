@@ -230,6 +230,9 @@ export function TimedDeliveries({
 
   return (
     <div className="space-y-5">
+      {/* ============ WAREHOUSE SIGNAL BOARD ============ */}
+      <WarehouseSignalBoard deliveries={filtered.length ? filtered : deliveries} timings={timings} onOpenDelivery={onOpenDelivery} />
+
       {/* View toggle */}
       <div className="flex items-center justify-between gap-2">
         <div className="inline-flex rounded-md border bg-card p-0.5">
