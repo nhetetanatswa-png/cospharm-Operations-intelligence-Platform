@@ -230,6 +230,9 @@ export function TimedDeliveries({
 
   return (
     <div className="space-y-5">
+      {/* ============ WAREHOUSE SIGNAL BOARD ============ */}
+      <WarehouseSignalBoard deliveries={filtered.length ? filtered : deliveries} timings={timings} onOpenDelivery={onOpenDelivery} />
+
       {/* View toggle */}
       <div className="flex items-center justify-between gap-2">
         <div className="inline-flex rounded-md border bg-card p-0.5">
@@ -488,5 +491,167 @@ function Kpi({ icon, label, value, tone }: { icon: React.ReactNode; label: strin
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function WarehouseSignalBoard({
+  deliveries,
+  timings,
+  onOpenDelivery,
+}: {
+  deliveries: Delivery[];
+  timings: DeliveryTimings;
+  onOpenDelivery?: (id: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const g: Record<TrafficLight, Delivery[]> = { red: [], yellow: [], green: [], idle: [] };
+    for (const d of deliveries) {
+      const light = deliveryTrafficLight(timings[d.id]);
+      const ui = deriveDeliveryUiStatus(timings[d.id]);
+      // Completed deliveries drop out of the live board — this is a live-ops view.
+      if (ui.label === "Completed") continue;
+      g[light].push(d);
+    }
+    return g;
+  }, [deliveries, timings]);
+
+  const overall: TrafficLight = groups.red.length ? "red" : groups.yellow.length ? "yellow" : groups.green.length ? "green" : "idle";
+  const overallLabel: Record<TrafficLight, string> = {
+    red: "CRITICAL — action required",
+    yellow: "WATCH — approaching target",
+    green: "ALL ON TRACK",
+    idle: "NO ACTIVE DELIVERIES",
+  };
+  const overallTone: Record<TrafficLight, string> = {
+    red: "from-status-red/25 to-status-red/5 border-status-red/40",
+    yellow: "from-status-yellow/25 to-status-yellow/5 border-status-yellow/40",
+    green: "from-status-green/25 to-status-green/5 border-status-green/40",
+    idle: "from-muted to-muted/40 border-border",
+  };
+
+  return (
+    <Card className={`overflow-hidden border-2 bg-gradient-to-br ${overallTone[overall]}`}>
+      <CardContent className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <BigTrafficLight light={overall} />
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Warehouse signal board</p>
+              <p className="text-2xl font-bold tracking-tight">{overallLabel[overall]}</p>
+              <p className="text-xs text-muted-foreground">Live view of every active delivery · updates every second</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <SignalCount light="red"    n={groups.red.length}    label="Critical" />
+            <SignalCount light="yellow" n={groups.yellow.length} label="Watch" />
+            <SignalCount light="green"  n={groups.green.length}  label="On track" />
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <SignalColumn title="Critical"  light="red"    items={groups.red}    timings={timings} onOpen={onOpenDelivery} />
+          <SignalColumn title="Watch"     light="yellow" items={groups.yellow} timings={timings} onOpen={onOpenDelivery} />
+          <SignalColumn title="On track"  light="green"  items={groups.green}  timings={timings} onOpen={onOpenDelivery} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BigTrafficLight({ light }: { light: TrafficLight }) {
+  const on = { r: light === "red", y: light === "yellow", g: light === "green" };
+  const lamp = (active: boolean, cls: string, pulse = false) =>
+    `size-8 rounded-full ${active ? cls : "bg-muted-foreground/15"} ${active && pulse ? "animate-pulse" : ""}`;
+  return (
+    <div className="inline-flex flex-col items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-3 ring-1 ring-border">
+      <span className={lamp(on.r, "bg-status-red shadow-[0_0_20px_theme(colors.red.500)]", true)} />
+      <span className={lamp(on.y, "bg-status-yellow shadow-[0_0_20px_theme(colors.yellow.400)]")} />
+      <span className={lamp(on.g, "bg-status-green shadow-[0_0_20px_theme(colors.green.500)]")} />
+    </div>
+  );
+}
+
+function SignalCount({ light, n, label }: { light: TrafficLight; n: number; label: string }) {
+  const tone: Record<TrafficLight, string> = {
+    red: "text-status-red",
+    yellow: "text-status-yellow-foreground",
+    green: "text-status-green",
+    idle: "text-muted-foreground",
+  };
+  return (
+    <div className="rounded-md border bg-background/60 px-4 py-2 min-w-[88px]">
+      <p className={`text-3xl font-extrabold leading-none ${tone[light]}`}>{n}</p>
+      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function SignalColumn({
+  title,
+  light,
+  items,
+  timings,
+  onOpen,
+}: {
+  title: string;
+  light: TrafficLight;
+  items: Delivery[];
+  timings: DeliveryTimings;
+  onOpen?: (id: string) => void;
+}) {
+  const header: Record<TrafficLight, string> = {
+    red: "bg-status-red/15 text-status-red border-status-red/30",
+    yellow: "bg-status-yellow/20 text-status-yellow-foreground border-status-yellow/30",
+    green: "bg-status-green/15 text-status-green border-status-green/30",
+    idle: "bg-muted text-muted-foreground",
+  };
+  return (
+    <div className="rounded-md border bg-background/70">
+      <div className={`flex items-center justify-between rounded-t-md border-b px-3 py-2 ${header[light]}`}>
+        <span className="text-xs font-bold uppercase tracking-wide">{title}</span>
+        <span className="text-xs font-mono">{items.length}</span>
+      </div>
+      <div className="max-h-72 overflow-y-auto p-2 space-y-1.5">
+        {items.length === 0 ? (
+          <p className="p-3 text-center text-[11px] text-muted-foreground">None</p>
+        ) : (
+          items.map((d) => {
+            const t = timings[d.id] ?? {};
+            let completed = 0;
+            for (let n = 1; n <= 7; n++) if (t[n]?.completionTime) completed += 1;
+            // find the currently active/most-recent step for detail
+            let activeStep = 0;
+            for (let n = 1; n <= 7; n++) {
+              const s = t[n];
+              if (s?.startTime && !s?.completionTime) { activeStep = n; break; }
+            }
+            if (!activeStep) activeStep = Math.min(7, completed + 1);
+            const rs = stepRuntimeStatus({ stepNumber: activeStep }, t[activeStep]);
+            const overMin = rs.actualMinutes != null ? rs.actualMinutes - rs.target : 0;
+            return (
+              <button
+                key={d.id}
+                onClick={() => onOpen?.(d.id)}
+                className="w-full rounded border bg-card px-2.5 py-2 text-left transition hover:border-primary hover:shadow-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold">{d.customerName}</p>
+                  <span className="font-mono text-[10px] text-muted-foreground">{d.id}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Step {activeStep}/7 · {t[activeStep]?.assignedPerson ?? "unassigned"}</span>
+                  <span className="font-mono">
+                    {rs.status === "NOT_STARTED" ? "—" : `${formatMinutes(rs.actualMinutes)} / ${formatMinutes(rs.target)}`}
+                  </span>
+                </div>
+                {light === "red" && overMin > 0 ? (
+                  <p className="mt-1 text-[11px] font-semibold text-status-red">Over by {formatMinutes(overMin)}</p>
+                ) : null}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }
