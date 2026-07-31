@@ -22,6 +22,8 @@ import {
   type StepTiming,
 } from "./delivery-timing";
 import { OPERATION_STEPS } from "./operations";
+import { DeliveryRiskPanel, type DeliveryRiskItem } from "./DeliveryRiskPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function TrafficDot({ light, size = "sm" }: { light: TrafficLight; size?: "sm" | "lg" }) {
   const dim = size === "lg" ? "size-3.5" : "size-2.5";
@@ -86,13 +88,17 @@ function useTick(intervalMs = 1000) {
   }, [intervalMs]);
 }
 
+type DeliveryView = "overview" | "risk" | "workflow";
+
 export function TimedDeliveries({
   deliveries,
+  riskItems,
   currentUserName,
   onOpenDelivery,
   onActiveAssignmentsChange,
 }: {
   deliveries: Delivery[];
+  riskItems?: DeliveryRiskItem[];
   currentUserName: string;
   onOpenDelivery?: (id: string) => void;
   onActiveAssignmentsChange?: (map: Record<string, string[]>) => void;
@@ -100,14 +106,14 @@ export function TimedDeliveries({
   useTick(1000);
   const [timings, setTimings] = useState<DeliveryTimings>({});
   const [filter, setFilter] = useState("");
-  const [view, setView] = useState<"risk" | "workflow">("workflow");
+  const [view, setView] = useState<DeliveryView>("overview");
 
   useEffect(() => { setTimings(loadTimings()); }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem("cospharm_deliveries_view");
-    if (saved === "risk" || saved === "workflow") setView(saved);
+    if (saved === "overview" || saved === "risk" || saved === "workflow") setView(saved as DeliveryView);
   }, []);
 
   useEffect(() => {
@@ -230,26 +236,33 @@ export function TimedDeliveries({
 
   return (
     <div className="space-y-5">
+      {/* View selector — the overview delivery risk panel is the default first view */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold">Deliveries</p>
+          <p className="text-xs text-muted-foreground">Choose how you want to see today's deliveries.</p>
+        </div>
+        <Select value={view} onValueChange={(v) => setView(v as DeliveryView)}>
+          <SelectTrigger className="w-[240px]">
+            <SelectValue placeholder="Select view" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="overview">⚡ Delivery Risk Panel</SelectItem>
+            <SelectItem value="risk">🚦 Traffic-light risk cards</SelectItem>
+            <SelectItem value="workflow">☰ Step workflow</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {view === "overview" ? (
+        <DeliveryRiskPanel
+          items={riskItems ?? []}
+          onOpen={(id) => onOpenDelivery?.(id)}
+        />
+      ) : null}
+
       {/* ============ WAREHOUSE SIGNAL BOARD ============ */}
       <WarehouseSignalBoard deliveries={filtered.length ? filtered : deliveries} timings={timings} onOpenDelivery={onOpenDelivery} />
-
-      {/* View toggle */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="inline-flex rounded-md border bg-card p-0.5">
-          <button
-            onClick={() => setView("risk")}
-            className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition ${view === "risk" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Zap className="size-3.5" /> Risk Panel
-          </button>
-          <button
-            onClick={() => setView("workflow")}
-            className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition ${view === "workflow" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Menu className="size-3.5" /> Step Workflow
-          </button>
-        </div>
-      </div>
 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -321,7 +334,7 @@ export function TimedDeliveries({
             </div>
           </CardContent>
         </Card>
-      ) : (
+      ) : view === "workflow" ? (
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -434,7 +447,7 @@ export function TimedDeliveries({
           ) : null}
         </CardContent>
       </Card>
-      )}
+      ) : null}
 
       {/* Staff leaderboard */}
       <Card>
