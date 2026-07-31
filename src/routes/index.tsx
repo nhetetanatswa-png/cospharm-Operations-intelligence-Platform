@@ -6,8 +6,8 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Cospharm Operations — Tasks & Stock Dashboard" },
       { name: "description", content: "Live traffic-light dashboard for Cospharm staff and supervisors to track daily tasks, stock health, and operational risks." },
-      { property: "og:title", content: "Cospharm Operations Dashboard" },
-      { property: "og:description", content: "Traffic-light monitoring for daily tasks and stock condition." },
+      { property: "og:title", content: "Cospharm Operations — Tasks & Stock Dashboard" },
+      { property: "og:description", content: "Live traffic-light dashboard for Cospharm staff and supervisors to track daily tasks, stock health, and operational risks." },
     ],
   }),
   component: Index,
