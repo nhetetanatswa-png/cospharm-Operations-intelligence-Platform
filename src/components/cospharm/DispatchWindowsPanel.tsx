@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sunrise, Sunset, Siren } from "lucide-react";
@@ -13,6 +14,8 @@ export function DispatchWindowsPanel({
   emergencyOrders: EmergencyOrder[];
   onOpenEmergency: () => void;
 }) {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
   const todayIso = new Date().toISOString().slice(0, 10);
   const today = deliveries.filter((d) => d.dueDate === todayIso);
 
@@ -38,7 +41,7 @@ export function DispatchWindowsPanel({
         <WindowBox
           icon={<Sunrise className="size-4 text-blue-700" />}
           title="Morning"
-          state={getWindowState("MORNING")}
+          state={hydrated ? getWindowState("MORNING") : "UPCOMING"}
           sub={DISPATCH_WINDOW_LABELS.MORNING.sub}
           assigned={m.assigned}
           dispatched={m.dispatched}
@@ -48,7 +51,7 @@ export function DispatchWindowsPanel({
         <WindowBox
           icon={<Sunset className="size-4 text-orange-700" />}
           title="Afternoon"
-          state={getWindowState("AFTERNOON")}
+          state={hydrated ? getWindowState("AFTERNOON") : "UPCOMING"}
           sub={DISPATCH_WINDOW_LABELS.AFTERNOON.sub}
           assigned={a.assigned}
           dispatched={a.dispatched}
