@@ -58,7 +58,7 @@ export function EmergencyOrdersBanner({
           <li key={d.id} className="flex items-center justify-between gap-2 rounded-md border border-status-red/40 bg-card px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{d.customerName}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{d.id} · marked emergency {d.emergencyFlaggedAt ? minutesSince(d.emergencyFlaggedAt) + " ago" : ""}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{d.id} · marked emergency {d.emergencyFlaggedAt ? minutesSince(d.emergencyFlaggedAt, now) + " ago" : ""}</p>
             </div>
             <span className="shrink-0 rounded-full bg-status-red px-2 py-0.5 text-[10px] font-bold text-white">EMERGENCY</span>
           </li>
@@ -67,7 +67,7 @@ export function EmergencyOrdersBanner({
           <li key={o.id} className="flex items-center justify-between gap-2 rounded-md border border-status-red/40 bg-card px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{o.customerName}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{o.id} · raised {minutesSince(o.orderedAt)} ago · {o.status.replace(/_/g, " ").toLowerCase()}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{o.id} · raised {minutesSince(o.orderedAt, now)} ago · {o.status.replace(/_/g, " ").toLowerCase()}</p>
             </div>
             <span className="shrink-0 rounded-full bg-status-red px-2 py-0.5 text-[10px] font-bold text-white">{o.status === "PENDING_APPROVAL" ? "PENDING" : "ACTIVE"}</span>
           </li>
