@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "cospharm-status-light",
+      "version": "0.1.0",
+      "title": "Cospharm Status Light"
+    },
+    "tools": [
+      {
+        "name": "search_customers",
+        "title": "Search customers",
+        "description": "Search Cospharm's customer, clinic, pharmacy and distributor directory by name, optionally filtered by type.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "query": {
+              "default": "",
+              "description": "Case-insensitive name fragment. Empty returns all.",
+              "type": "string"
+            },
+            "type": {
+              "description": "Optional customer type filter.",
+              "type": "string",
+              "enum": [
+                "Distributor",
+                "Hospital",
+                "Pharmacy",
+                "Retail Chain",
+                "Other"
+              ]
+            },
+            "limit": {
+              "default": 25,
+              "description": "Maximum records to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_workflow_steps",
+        "title": "List delivery workflow steps",
+        "description": "List the 7-step timed Cospharm delivery workflow with each step's owning department, target time in minutes, and the roles allowed to complete it.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_staff",
+        "title": "List staff roster",
+        "description": "List the Cospharm staff roster with job title, operational role and shift, optionally filtered by shift.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "shift": {
+              "description": "Optional shift filter.",
+              "type": "string",
+              "enum": [
+                "Morning",
+                "Afternoon",
+                "Night",
+                "All-day"
+              ]
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "describe_role",
+        "title": "Describe a role",
+        "description": "Describe what a Cospharm dashboard role can do. Omit the role to list every available role key.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "role": {
+              "description": "Role key, e.g. warehouse_checker. Omit to list all roles.",
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
