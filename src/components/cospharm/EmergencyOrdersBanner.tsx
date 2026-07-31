@@ -1,9 +1,11 @@
 import { Siren } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Delivery, EmergencyOrder } from "./types";
 
-function minutesSince(iso: string) {
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+function minutesSince(iso: string, now: number | null) {
+  if (now === null) return "—";
+  const m = Math.round((now - new Date(iso).getTime()) / 60000);
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ${m % 60}m`;
@@ -19,6 +21,13 @@ export function EmergencyOrdersBanner({
   emergencyOrders: EmergencyOrder[];
   onOpen: () => void;
 }) {
+  // Rendered only after hydration so server and client markup match.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
   const flagged = deliveries.filter((d) => d.priority === "emergency" && d.status !== "DELIVERED");
   const liveEmergency = emergencyOrders.filter((o) => !["DELIVERED", "CANCELLED"].includes(o.status));
   const total = flagged.length + liveEmergency.length;
