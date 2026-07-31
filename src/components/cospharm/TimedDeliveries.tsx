@@ -334,7 +334,7 @@ export function TimedDeliveries({
             </div>
           </CardContent>
         </Card>
-      ) : (
+      ) : view === "workflow" ? (
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -447,7 +447,7 @@ export function TimedDeliveries({
           ) : null}
         </CardContent>
       </Card>
-      )}
+      ) : null}
 
       {/* Staff leaderboard */}
       <Card>
