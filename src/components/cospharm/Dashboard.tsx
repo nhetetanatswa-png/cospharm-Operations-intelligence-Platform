@@ -56,7 +56,7 @@ import { WorkAssignments } from "./WorkAssignments";
 import { CapacityCoverage } from "./CapacityCoverage";
 import { ComplianceKyc } from "./ComplianceKyc";
 import { IntelligenceModule } from "./IntelligenceModule";
-import { loadCounts, loadDamages, saveKycNoop, type DamageRecord, type InventoryCount } from "./inventory";
+import { loadCounts, loadDamages, type DamageRecord, type InventoryCount } from "./inventory";
 import { loadKyc, saveKyc, type KycRecord, type KycStatus } from "./kyc";
 import {
   deliveryStatusBadge,
