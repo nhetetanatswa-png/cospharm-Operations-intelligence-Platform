@@ -738,19 +738,19 @@ export function CospharmDashboard() {
           <TabsList className="flex w-full flex-wrap sm:inline-flex">
             <TabsTrigger value="overview" className="gap-1.5"><LayoutDashboard className="size-4" /> Overview</TabsTrigger>
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Tasks</TabsTrigger>
-            <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Stock</TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Assignments</TabsTrigger>
+            <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Inventory</TabsTrigger>
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
               <Megaphone className="size-4" /> Marketer
             </TabsTrigger>
             <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
-              <Shield className="size-4" /> Regulatory
+              <Shield className="size-4" /> Compliance
             </TabsTrigger>
             <TabsTrigger value="presence" className="gap-1.5">
-              <UserCheck className="size-4" /> Presence
+              <UserCheck className="size-4" /> Capacity
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
-            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Intelligence</TabsTrigger>
             <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
               <UserCog className="size-4" /> Admin
             </TabsTrigger>
