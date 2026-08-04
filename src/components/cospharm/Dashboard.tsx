@@ -846,106 +846,26 @@ export function CospharmDashboard() {
 
           {/* ============ TASKS ============ */}
           <TabsContent value="tasks">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">{["staff","warehouse_staff","warehouse_checker","dispatch_staff"].includes(role) ? "My tasks" : "All tasks"}</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Staff mark tasks complete with a comment/evidence note; supervisors verify before tasks become final green.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[90px]">ID</TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Assignee</TableHead>
-                      <TableHead>Due</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTasks.map((t) => (
-                      <TableRow key={t.id} onClick={() => setOpenTaskId(t.id)} className="cursor-pointer">
-                        <TableCell className="font-mono text-xs text-muted-foreground">{t.id}</TableCell>
-                        <TableCell>
-                          <div className="font-medium flex items-center gap-2">
-                            {t.title}
-                            {t.pendingVerification ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-status-yellow/20 px-2 py-0.5 text-[10px] text-status-yellow-foreground">
-                                <ShieldCheck className="size-3" /> Pending verification
-                              </span>
-                            ) : null}
-                          </div>
-                          {t.note ? <div className="text-xs text-muted-foreground">{t.note}</div> : null}
-                        </TableCell>
-                        <TableCell className="text-sm">{t.assignee}</TableCell>
-                        <TableCell className="text-sm">{t.due}</TableCell>
-                        <TableCell className="text-right"><StatusBadge status={t.status} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <WorkAssignments
+              tasks={filteredTasks}
+              role={role}
+              currentUserName={currentUser.name}
+              onOpenTask={setOpenTaskId}
+              onVerify={verifyTask}
+            />
           </TabsContent>
 
           {/* ============ STOCK ============ */}
           <TabsContent value="stock">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Stock condition</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Batch</TableHead>
-                      <TableHead>Available / Damaged</TableHead>
-                      <TableHead className="w-[160px]">Level</TableHead>
-                      <TableHead>Expiry</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStock.map((s) => {
-                      const pct = Math.min(100, Math.round((s.onHand / s.capacity) * 100));
-                      const canEdit = can(role, "stock.update");
-                      const canReport = can(role, "stock.report");
-                      return (
-                        <TableRow key={s.id}>
-                          <TableCell>
-                            <div className="font-medium">{s.name}</div>
-                            <div className="font-mono text-xs text-muted-foreground">{s.sku}</div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{s.batch ?? "—"}</TableCell>
-                          <TableCell className="text-sm">
-                            {s.onHand - (s.damagedUnits ?? 0)}
-                            {s.damagedUnits ? <span className="text-status-red"> · {s.damagedUnits} damaged</span> : null}
-                          </TableCell>
-                          <TableCell>
-                            <Progress value={pct} className="h-1.5" />
-                            {s.issue ? <div className="mt-1 text-xs text-muted-foreground">{s.issue}</div> : null}
-                          </TableCell>
-                          <TableCell className="text-sm">{s.expiry}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <StatusBadge status={s.status} />
-                              {canEdit || canReport ? (
-                                <Button size="sm" variant="ghost" onClick={() => setStockDialog(s)}>
-                                  {canEdit ? "Update" : "Report"}
-                                </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <InventoryIntegrity
+              stock={filteredStock}
+              counts={counts}
+              damages={damages}
+              deliveries={deliveries}
+              role={role}
+              onOpenStock={setStockDialog}
+              onOpenDelivery={setOpenDeliveryId}
+            />
           </TabsContent>
 
           {/* ============ MARKETER ============ */}
@@ -984,6 +904,7 @@ export function CospharmDashboard() {
             <Tabs defaultValue="trail" className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <TabsList>
+                  <TabsTrigger value="intelligence">Weekly intelligence</TabsTrigger>
                   <TabsTrigger value="trail">Audit trail</TabsTrigger>
                   <TabsTrigger value="performance">Performance report</TabsTrigger>
                   <TabsTrigger value="digest">Notes digest</TabsTrigger>
@@ -1000,6 +921,14 @@ export function CospharmDashboard() {
                   fieldLog={fieldLog}
                 />
               </div>
+              <TabsContent value="intelligence">
+                <IntelligenceModule
+                  inputs={{
+                    deliveries, tasks, stock, counts, damages, kyc, audit, alerts, comments,
+                    staffCount: STAFF.length,
+                  }}
+                />
+              </TabsContent>
               <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
               <TabsContent value="performance">
                 <PerformanceReport deliveries={deliveries} audit={audit} />
@@ -1012,19 +941,23 @@ export function CospharmDashboard() {
 
           {/* ============ REGULATORY ============ */}
           <TabsContent value="regulatory">
-            <RegulatoryModule
+            <ComplianceKyc
+              records={kyc}
+              deliveries={deliveries}
+              role={role}
               licenses={SEED_LICENSES}
               zones={SEED_ZONES}
               batches={SEED_BATCHES}
               controlled={SEED_CONTROLLED}
               inspection={SEED_INSPECTION}
-              deliveries={deliveries}
+              onSetStatus={setKycStatus}
+              onOpenDelivery={setOpenDeliveryId}
             />
           </TabsContent>
 
           {/* ============ PRESENCE & DELEGATION ============ */}
           <TabsContent value="presence" className="space-y-4">
-            <PresenceBoard activeAssignments={activeAssignments} />
+            <CapacityCoverage deliveries={deliveries} tasks={tasks} activeAssignments={activeAssignments} />
           </TabsContent>
 
           {/* ============ ADMIN ============ */}
