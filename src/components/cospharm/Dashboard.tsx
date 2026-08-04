@@ -51,6 +51,13 @@ import { Shield, UserCheck } from "lucide-react";
 import { TimedDeliveries } from "./TimedDeliveries";
 import { PresenceBoard } from "./PresenceBoard";
 import { DeliveryRiskPanel } from "./DeliveryRiskPanel";
+import { InventoryIntegrity } from "./InventoryIntegrity";
+import { WorkAssignments } from "./WorkAssignments";
+import { CapacityCoverage } from "./CapacityCoverage";
+import { ComplianceKyc } from "./ComplianceKyc";
+import { IntelligenceModule } from "./IntelligenceModule";
+import { loadCounts, loadDamages, saveKycNoop, type DamageRecord, type InventoryCount } from "./inventory";
+import { loadKyc, saveKyc, type KycRecord, type KycStatus } from "./kyc";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -355,6 +362,24 @@ export function CospharmDashboard() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
   const [openDeliveryId, setOpenDeliveryId] = useState<string | null>(null);
+
+  // Client-only registers (localStorage backed) for the inventory and compliance modules
+  const [counts, setCounts] = useState<InventoryCount[]>([]);
+  const [damages, setDamages] = useState<DamageRecord[]>([]);
+  const [kyc, setKyc] = useState<KycRecord[]>([]);
+  useEffect(() => {
+    setCounts(loadCounts(INITIAL_STOCK));
+    setDamages(loadDamages(INITIAL_STOCK));
+    setKyc(loadKyc());
+  }, []);
+
+  function setKycStatus(customer: string, status: KycStatus) {
+    setKyc((prev) => {
+      const next = prev.map((r) => (r.customer === customer ? { ...r, status, lastReviewed: new Date().toISOString().slice(0, 10) } : r));
+      saveKyc(next);
+      return next;
+    });
+  }
 
   // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
