@@ -234,7 +234,7 @@ export function CommandCentre({
       parts.push("No delivery is blocked, late or flagged at risk, so today's commitments are intact.");
     }
     if (criticalStock.length) {
-      parts.push(`${countLabel(criticalStock.length, "stock line")} sits in the red — ${criticalStock.map((s) => s.name).join(", ")} — and ${criticalStock.length === 1 ? "is" : "are"} the main fulfilment constraint.`);
+      parts.push(`${countLabel(criticalStock.length, "stock line")} ${criticalStock.length === 1 ? "sits" : "sit"} in the red — ${criticalStock.map((s) => s.name).join(", ")} — and ${criticalStock.length === 1 ? "is" : "are"} the main fulfilment constraint.`);
     }
     if (unresolvedEmergencies.length) {
       parts.push(`${countLabel(unresolvedEmergencies.length, "emergency order")} still ${unresolvedEmergencies.length === 1 ? "needs" : "need"} a management decision.`);
