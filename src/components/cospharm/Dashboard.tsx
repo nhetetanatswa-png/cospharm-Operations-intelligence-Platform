@@ -135,7 +135,7 @@ function DashboardInner({ now }: { now: number }) {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<Role>("admin");
-  const currentUser = ROLE_USERS[role];
+  const currentUser = ROLE_USERS_FULL[role];
 
   const [tasks, setTasks] = useState<Task[]>(seed.tasks);
   const [stock, setStock] = useState<StockItem[]>(seed.stock);
