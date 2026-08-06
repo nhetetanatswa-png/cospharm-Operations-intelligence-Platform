@@ -160,3 +160,31 @@
     color: var(--color-foreground);
   }
 }
+
+/* ===== GM management briefing — print only ===== */
+#gm-brief { display: none; }
+
+@media print {
+  body.printing-brief > *:not(#gm-brief) { display: none !important; }
+  body.printing-brief #gm-brief {
+    display: block !important;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #111;
+    padding: 0;
+  }
+  #gm-brief h1 { font-size: 16pt; margin: 0 0 2pt; }
+  #gm-brief h2 {
+    font-size: 10pt; text-transform: uppercase; letter-spacing: .08em;
+    margin: 12pt 0 3pt; padding-bottom: 2pt; border-bottom: 1px solid #999;
+  }
+  #gm-brief header p { font-size: 9pt; color: #444; margin: 0 0 6pt; }
+  #gm-brief p, #gm-brief li { margin: 0 0 4pt; }
+  #gm-brief ol, #gm-brief ul { margin: 0 0 4pt 14pt; padding: 0; }
+  #gm-brief li { margin-bottom: 5pt; }
+  #gm-brief table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  #gm-brief th, #gm-brief td { border: 1px solid #bbb; padding: 3pt 5pt; text-align: left; }
+  #gm-brief th { width: 22%; background: #f1f1f1; font-weight: 600; }
+  @page { size: A4 portrait; margin: 14mm; }
+}
