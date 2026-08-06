@@ -93,268 +93,63 @@ import type {
   License,
 } from "./types";
 import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
-
-// ===== Seed data =====
-
-const todayIso = new Date().toISOString().slice(0, 10);
-const yesterdayIso = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-const INITIAL_TASKS: Task[] = [
-  { id: "T-1042", title: "Morning cold-chain temperature log", assignee: "Ada Bello", shift: "Morning", due: "07:30", status: "green", note: "All readings within range." },
-  { id: "T-1043", title: "Restock dispensary shelves A–C", assignee: "John Mensah", shift: "Morning", due: "09:00", status: "yellow", note: "Started — shelf C pending" },
-  { id: "T-1044", title: "Sign off overnight delivery manifest", assignee: "Mary Adeyemi", shift: "Morning", due: "08:00", status: "red", note: "Not signed — driver waiting" },
-  { id: "T-1045", title: "Controlled drugs cabinet count", assignee: "Grace Okoye", shift: "Morning", due: "10:00", status: "green", note: "Counts match register.", verifiedBy: "Mary Adeyemi", verifiedAt: new Date().toISOString() },
-  { id: "T-1046", title: "Clean & sanitise compounding bench", assignee: "Tunde Aliu", shift: "Afternoon", due: "13:00", status: "yellow", note: "In progress" },
-  { id: "T-1047", title: "Patient delivery batch #B-228", assignee: "John Mensah", shift: "Afternoon", due: "14:30", status: "red", note: "2 items short — see stock" },
-  { id: "T-1048", title: "Equipment calibration check", assignee: "Ada Bello", shift: "Afternoon", due: "15:00", status: "green", note: "Calibrated, certificate filed.", pendingVerification: true },
-  { id: "T-1049", title: "End-of-day handover log", assignee: "Mary Adeyemi", shift: "Night", due: "20:00", status: "yellow", note: "Awaiting pharmacist sign-off" },
-];
-
-const INITIAL_STOCK: StockItem[] = [
-  { id: "S-001", name: "Paracetamol 500mg", sku: "PCM-500", category: "Analgesics", onHand: 1240, reorder: 400, capacity: 2000, expiry: "2027-04", status: "green", batch: "B-7741" },
-  { id: "S-002", name: "Amoxicillin 250mg", sku: "AMX-250", category: "Antibiotics", onHand: 320, reorder: 500, capacity: 1500, expiry: "2026-09", status: "yellow", issue: "Below reorder level", batch: "B-3320" },
-  { id: "S-003", name: "Insulin Glargine 100IU", sku: "INS-GLA", category: "Cold chain", onHand: 28, reorder: 60, capacity: 200, expiry: "2026-03", status: "red", issue: "Critically low — affects 3 deliveries", batch: "B-9011" },
-  { id: "S-004", name: "Salbutamol Inhaler", sku: "SAL-INH", category: "Respiratory", onHand: 145, reorder: 80, capacity: 300, expiry: "2026-11", status: "green", batch: "B-5520" },
-  { id: "S-005", name: "Metformin 500mg", sku: "MET-500", category: "Diabetes", onHand: 880, reorder: 300, capacity: 1500, expiry: "2027-01", status: "green", batch: "B-6610" },
-  { id: "S-006", name: "Ceftriaxone 1g Vial", sku: "CEF-1G", category: "Antibiotics", onHand: 60, reorder: 100, capacity: 400, expiry: "2026-02", status: "yellow", issue: "12 units damaged on receipt", batch: "B-4408", damagedUnits: 12 },
-  { id: "S-007", name: "Loratadine 10mg", sku: "LOR-10", category: "Antihistamines", onHand: 12, reorder: 150, capacity: 600, expiry: "2025-12", status: "red", issue: "Near expiry & critically low", batch: "B-2210" },
-  { id: "S-008", name: "ORS Sachets", sku: "ORS-S", category: "Rehydration", onHand: 540, reorder: 200, capacity: 1000, expiry: "2027-08", status: "green", batch: "B-8810" },
-];
-
-const INITIAL_DELIVERIES: Delivery[] = [
-  {
-    id: "D-1042", customerName: "Princess Marina Hospital", assignedMarketer: "Bisa", assignedOps: "TT",
-    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
-    requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
-    dispatchWindow: "MORNING",
-  },
-  {
-    id: "D-1043", customerName: "Sidilega Private Hospital", assignedMarketer: "Bisa", assignedOps: "Phuso",
-    dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
-    requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
-    dispatchWindow: "MORNING",
-  },
-  {
-    id: "D-1044", customerName: "Lenmed Bokamoso Private Hospital", assignedMarketer: "Bakang", assignedOps: "Tshepang",
-    dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
-    requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
-    delayReason: "Insulin Glargine critically low",
-    dispatchWindow: "AFTERNOON",
-    priority: "emergency",
-    emergencyFlaggedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    id: "D-1045", customerName: "Mediland Healthcare Distributors", assignedMarketer: "Lebo", assignedOps: "TT",
-    dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
-    requiredStockIds: ["S-007"], requiredTaskIds: [],
-    dispatchWindow: "MORNING",
-    wasLate: true,
-    delayReason: "POD pending from previous delivery slowed route. Driver returned after 10:30 cutoff.",
-    responsibleDept: "Dispatch",
-    customerNotified: true,
-    notificationMethod: "CALL",
-  },
-  {
-    id: "D-1046", customerName: "Acacia Medicare Clinic", assignedMarketer: "Bisa", assignedOps: "Phuso",
-    dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
-    requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
-    dispatchWindow: "AFTERNOON",
-  },
-  {
-    id: "D-1047", customerName: "Gaborone Private Hospital", assignedMarketer: "Bakang", assignedOps: "TT",
-    dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
-    requiredStockIds: ["S-004"], requiredTaskIds: [],
-    dispatchWindow: "MORNING",
-  },
-  {
-    id: "D-1048", customerName: "Medswana", assignedMarketer: "Lebo", assignedOps: "Tshepang",
-    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(3),
-    requiredStockIds: ["S-005"], requiredTaskIds: [],
-    dispatchWindow: "AFTERNOON",
-  },
-];
-
-const ROLE_USERS = ROLE_USERS_FULL;
-
-const STAFF = STAFF_ROSTER.map((s) => ({
-  name: s.name,
-  role: s.title,
-  shift: s.shift ?? "All-day",
-  tasksDone: Math.floor(Math.random() * 7) + 1,
-  tasksPending: Math.floor(Math.random() * 3),
-}));
-
-const seedAudit = (): AuditEntry[] => [
-  {
-    id: "A-001", entityType: "task", entityId: "T-1045", entityLabel: "Controlled drugs cabinet count",
-    field: "status", oldValue: "yellow", newValue: "green",
-    user: "Grace Okoye", role: "staff", comment: "Counts match register; witnessed by supervisor.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-  },
-  {
-    id: "A-002", entityType: "stock", entityId: "S-006", entityLabel: "Ceftriaxone 1g Vial",
-    field: "issue", oldValue: "—", newValue: "12 units damaged on receipt",
-    user: "John Mensah", role: "staff", comment: "Damage report filed against shipment INV-9921.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
-];
-
-const SEED_PROMO_STOCK: PromoStockItem[] = [
-  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12",
-    requestedBy: "Bisa", reasonForRequest: "Princess Marina open day this Friday — need 50 samples to hand out.",
-    requestStatus: "APPROVED", decidedBy: "Aobakwe",
-    notes: [
-    { id: "PN-1", authorName: "Lesego", authorRole: "marketing_supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
-  ]},
-  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120,
-    requestedBy: "Sofia", reasonForRequest: "Telesales follow-up bundle for 60 pharmacies.", requestStatus: "PENDING",
-    notes: [] },
-  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08",
-    requestedBy: "Bakang", reasonForRequest: "Sample drop to 3 new clinics in Mogoditshane.", requestStatus: "DECLINED",
-    decidedBy: "Aobakwe",
-    notes: [] },
-  { id: "PS-004", name: "Branded Tote Bags", sku: "PRM-TT-02", category: "Giveaways", onHand: 300, allocated: 60, notes: [] },
-  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03",
-    requestedBy: "Lebo", reasonForRequest: "Gaborone Mall activation 80 samples.", requestStatus: "APPROVED", decidedBy: "Lesego",
-    notes: [
-    { id: "PN-2", authorName: "Lebo", authorRole: "marketer", message: "Holding 80 for the Gaborone activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
-  ]},
-  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300,
-    requestedBy: "Sofia", reasonForRequest: "Mailout pack for telesales pipeline.", requestStatus: "PENDING",
-    notes: [] },
-  { id: "PS-007", name: "Branded Lanyards", sku: "PRM-LN-05", category: "Giveaways", onHand: 250, allocated: 50, notes: [] },
-  { id: "PS-008", name: "Hand Sanitiser 60ml", sku: "PRM-HS-06", category: "Samples", onHand: 420, allocated: 90, expiry: "2026-10", notes: [] },
-  { id: "PS-009", name: "Pull-up Banners", sku: "PRM-BN-07", category: "Activation kit", onHand: 18, allocated: 4, notes: [
-    { id: "PN-3", authorName: "Aobakwe", authorRole: "marketing_lead", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
-  ]},
-  { id: "PS-010", name: "Cospharm Branded Notebooks", sku: "PRM-NB-08", category: "Giveaways", onHand: 350, allocated: 70, notes: [] },
-  { id: "PS-011", name: "Multivitamin Sample Packs", sku: "PRM-MV-09", category: "Samples", onHand: 240, allocated: 60, expiry: "2027-01", notes: [] },
-  { id: "PS-012", name: "Cough Syrup Mini Bottles", sku: "PRM-CS-10", category: "Samples", onHand: 96, allocated: 16, expiry: "2026-09", notes: [] },
-];
-
-const SEED_VISITS: FieldVisit[] = [
-  { id: "FV-1", title: "Princess Marina quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Bisa", customer: "Princess Marina Hospital", location: "Gaborone", notes: "Bring Q3 sales report", status: "PLANNED" },
-  { id: "FV-2", title: "OSC — Acacia Medicare Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Bisa", customer: "Acacia Medicare Clinic", status: "PLANNED" },
-];
-
-const SEED_FIELD_LOG: FieldLogEntry[] = [
-  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Sidilega Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Procurement lead interested in expanded antibiotics range; will revert next week.", createdAt: new Date(Date.now() - 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP"] },
-  { id: "FL-2", date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Lenmed Bokamoso Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Closed order for cardiovascular range; PO to follow.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), activities: ["SITE_VISIT", "PROMO_TALK"] },
-  { id: "FL-3", date: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Medplus Medical Centre", visitType: "ACTIVATION", outcome: "SAMPLE_GIVEN", productsUsed: [{ promoStockId: "PS-005", productName: "Vitamin C Sample Sachets", quantity: 40 }], notes: "Activation table outside reception; 40 sachets handed out.", createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP", "PROMO_TALK"] },
-  { id: "FL-4", date: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10), marketer: "Sofia", customer: "Mediland Healthcare Distributors", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [], notes: "Telesales call with procurement.", createdAt: new Date(Date.now() - 4 * 86400000).toISOString(), activities: ["TELESALES_CALL"] },
-  { id: "FL-5", date: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Acacia Medicare Clinic", visitType: "CUSTOMER_VISIT", outcome: "INFO_ONLY", productsUsed: [], notes: "Stock check — re-orders due in 2 weeks.", createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), activities: ["STOCK_CHECK"] },
-  { id: "FL-6", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Life Gaborone Private Hospital", visitType: "MEETING", outcome: "FOLLOW_UP", productsUsed: [], notes: "Training session on new respiratory range delivered to ward sisters.", createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), activities: ["TRAINING", "PROMO_TALK"] },
-  { id: "FL-7", date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Gaborone Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Order placed for paediatric line; awaiting credit clearance.", createdAt: new Date(Date.now() - 9 * 86400000).toISOString(), activities: ["SITE_VISIT"] },
-];
-
-const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
-  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Bisa", requestedByRole: "marketer", customer: "Princess Marina Hospital", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
-];
-
-const SEED_CALENDAR: CalendarEvent[] = [
-  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Legkotla P.", description: "Full warehouse count", important: true },
-  { id: "CE-2", title: "BoMRA inspection", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Tariro", important: true },
-  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Bisa", location: "Gaborone Mall" },
-  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Aobakwe" },
-  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Mr. T", important: true },
-];
-
-const TARGET_DELIVERIES_PER_DAY = 8;
-
-const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
-  {
-    id: "EMG-1001",
-    orderedBy: "Bisa",
-    orderedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    customerName: "Medplus Medical Centre",
-    clientContact: CLIENT_CONTACTS["Medplus Medical Centre"],
-    items: [{ productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" }],
-    reason: "Customer ran out mid-week; next scheduled dispatch is tomorrow.",
-    status: "PENDING_APPROVAL",
-  },
-  {
-    id: "EMG-1002",
-    orderedBy: "Lesego",
-    orderedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-    customerName: "Sir Ketumile Masire Teaching Hospital",
-    clientContact: CLIENT_CONTACTS["Sir Ketumile Masire Teaching Hospital"],
-    items: [
-      { productName: "Surgical Gloves Medium", quantity: 100, urgencyNote: "Theatre running low" },
-      { productName: "Paracetamol 500mg", quantity: 200, urgencyNote: "" },
-    ],
-    reason: "Theatre stock-out risk before tomorrow's window.",
-    authorisedBy: "Mr. T",
-    authorisedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    driverAssigned: "TT",
-    estimatedDelivery: "14:30",
-    status: "DISPATCHED",
-  },
-];
-
-// ===== Regulatory & HR seed data =====
-function daysFromNow(d: number) { return new Date(Date.now() + d * 86400000).toISOString().slice(0, 10); }
-
-const SEED_LICENSES: License[] = [
-  { id: "LIC-1", type: "Wholesale Dealer's License", holder: "Cospharm (Pty) Ltd", issueDate: "2024-03-01", expiryDate: daysFromNow(120) },
-  { id: "LIC-2", type: "Qualified Person License", holder: "Tariro M. (QP)", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
-  { id: "LIC-3", type: "Import Permit", holder: "Shipment INV-7732", issueDate: daysFromNow(-15), expiryDate: daysFromNow(15) },
-  { id: "LIC-4", type: "Import Permit", holder: "Shipment INV-7741", issueDate: daysFromNow(-10), expiryDate: daysFromNow(80) },
-  { id: "LIC-5", type: "Export Permit", holder: "Shipment EXP-2210", issueDate: daysFromNow(-5), expiryDate: daysFromNow(-2) },
-  { id: "LIC-6", type: "Export Permit", holder: "Shipment EXP-2244", issueDate: daysFromNow(-1), expiryDate: daysFromNow(28) },
-];
-
-const SEED_ZONES: ColdChainZone[] = [
-  { id: "Z-1", name: "Cooler A — Vaccines", currentTempC: 4.1, targetRange: [2, 8], lastBreachAt: undefined, resolved: true },
-  { id: "Z-2", name: "Cooler B — Insulin", currentTempC: 6.5, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 9 * 86400000).toISOString(), breachDurationMins: 22, resolved: true },
-  { id: "Z-3", name: "Cooler C — Biologics", currentTempC: 9.2, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 2 * 3600000).toISOString(), breachDurationMins: 75, resolved: false },
-  { id: "Z-4", name: "Ambient Bay — Controlled", currentTempC: 22.0, targetRange: [15, 25], resolved: true },
-];
-
-const SEED_BATCHES: BatchRecord[] = [
-  { id: "B-1", batchNumber: "B-7741", product: "Paracetamol 500mg", expiry: daysFromNow(800), quantity: 1240, linkedDeliveryIds: ["D-1042", "D-1046"] },
-  { id: "B-2", batchNumber: "B-3320", product: "Amoxicillin 250mg", expiry: daysFromNow(120), quantity: 320, linkedDeliveryIds: ["D-1043"] },
-  { id: "B-3", batchNumber: "B-9011", product: "Insulin Glargine 100IU", expiry: daysFromNow(60), quantity: 28, linkedDeliveryIds: ["D-1044"] },
-  { id: "B-4", batchNumber: "B-2210", product: "Loratadine 10mg", expiry: daysFromNow(15), quantity: 12, linkedDeliveryIds: [] },
-  { id: "B-5", batchNumber: "B-8810", product: "ORS Sachets", expiry: daysFromNow(600), quantity: 540, linkedDeliveryIds: ["D-1048"] },
-];
-
-const SEED_CONTROLLED: ControlledDrugLog[] = [
-  { id: "CD-1", product: "Pethidine 50mg", batch: "B-PD-091", handler: "Tariro", action: "RECEIVED", timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
-  { id: "CD-2", product: "Morphine 10mg/ml", batch: "B-MP-244", handler: "Aman", action: "DISPENSED", timestamp: new Date(Date.now() - 3 * 3600000).toISOString() },
-  { id: "CD-3", product: "Diazepam 5mg", batch: "B-DZ-115", handler: "Alaska", action: "TRANSFERRED", timestamp: new Date(Date.now() - 1 * 3600000).toISOString() },
-];
-
-const SEED_INSPECTION: Inspection = {
-  lastDate: daysFromNow(-90),
-  nextDate: daysFromNow(10),
-  actions: [
-    { id: "CA-1", description: "Replace temperature logger in Cooler C", due: daysFromNow(-3), status: "OPEN" },
-    { id: "CA-2", description: "Update SOP for controlled drug transfers", due: daysFromNow(5), status: "OPEN" },
-    { id: "CA-3", description: "Renew QP delegation letter", due: daysFromNow(-20), status: "CLOSED" },
-  ],
-};
+import { useHydratedNow, countLabel, formatDay, formatTime } from "./clock";
+import { buildSeed, TARGET_DELIVERIES_PER_DAY } from "./seed-data";
+import { resolveAll, summarise, isActiveDelivery } from "./delivery-status";
+import { CommandCentre } from "./CommandCentre";
 
 // ===== Component =====
 
 export function CospharmDashboard() {
+  // Every date in this app is derived from a hydration-safe clock. Until the
+  // browser clock is available we render a shell, so the server and client
+  // markup can never disagree about a date or a relative timestamp.
+  const now = useHydratedNow();
+  if (now === null) return <DashboardShell />;
+  return <DashboardInner now={now} />;
+}
+
+function DashboardShell() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3">
+          <img src={cospharmLogo.url} alt="Cospharm logo" className="size-11 object-contain" />
+          <div>
+            <p className="text-base font-semibold tracking-tight text-primary">Cospharm</p>
+            <p className="text-[11px] font-medium italic text-status-red">Believe in Good</p>
+          </div>
+        </div>
+        <p className="mt-8 text-sm text-muted-foreground">Loading today&apos;s operational position…</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl border bg-secondary/40" />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardInner({ now }: { now: number }) {
+  const seed = useState(() => buildSeed(now))[0];
+  const todayIso = seed.todayIso;
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<Role>("admin");
   const currentUser = ROLE_USERS[role];
 
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [stock, setStock] = useState<StockItem[]>(INITIAL_STOCK);
-  const [audit, setAudit] = useState<AuditEntry[]>(seedAudit);
-  const [deliveries, setDeliveries] = useState<Delivery[]>(INITIAL_DELIVERIES);
+  const [tasks, setTasks] = useState<Task[]>(seed.tasks);
+  const [stock, setStock] = useState<StockItem[]>(seed.stock);
+  const [audit, setAudit] = useState<AuditEntry[]>(seed.audit);
+  const [deliveries, setDeliveries] = useState<Delivery[]>(seed.deliveries);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(SEED_CALENDAR);
-  const [promoStock, setPromoStock] = useState<PromoStockItem[]>(SEED_PROMO_STOCK);
-  const [visits, setVisits] = useState<FieldVisit[]>(SEED_VISITS);
-  const [fieldLog, setFieldLog] = useState<FieldLogEntry[]>(SEED_FIELD_LOG);
-  const [authRequests, setAuthRequests] = useState<AuthorisationRequest[]>(SEED_AUTH_REQUESTS);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(seed.calendar);
+  const [promoStock, setPromoStock] = useState<PromoStockItem[]>(seed.promoStock);
+  const [visits, setVisits] = useState<FieldVisit[]>(seed.visits);
+  const [fieldLog, setFieldLog] = useState<FieldLogEntry[]>(seed.fieldLog);
+  const [authRequests, setAuthRequests] = useState<AuthorisationRequest[]>(seed.authRequests);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
+  const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(seed.emergencyOrders);
   const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
   const [activeAssignments, setActiveAssignments] = useState<Record<string, string[]>>({});
@@ -368,8 +163,8 @@ export function CospharmDashboard() {
   const [damages, setDamages] = useState<DamageRecord[]>([]);
   const [kyc, setKyc] = useState<KycRecord[]>([]);
   useEffect(() => {
-    setCounts(loadCounts(INITIAL_STOCK));
-    setDamages(loadDamages(INITIAL_STOCK));
+    setCounts(loadCounts(seed.stock));
+    setDamages(loadDamages(seed.stock));
     setKyc(loadKyc());
   }, []);
 
@@ -681,11 +476,18 @@ export function CospharmDashboard() {
     [deliveries, tasks, stock],
   );
 
-  const deliveredToday = deliveries.filter((d) => d.status === "DELIVERED" && d.dueDate === todayIso).length;
-  const pendingDeliveries = deliveries.filter((d) => ["PENDING", "IN_PROGRESS"].includes(d.status)).length;
-  const atRiskDeliveries = deliveries.filter((d) => d.status === "AT_RISK").length;
-  const lateDeliveries = deliveries.filter((d) => d.status === "LATE").length;
-  const blockedDeliveries = deliveries.filter((d) => d.status === "BLOCKED").length;
+  // Single source of truth — Overview, Command Centre and the reports all read these.
+  const resolved = useMemo(() => resolveAll(deliveries, seed.timings), [deliveries, seed.timings]);
+  const activeResolved = useMemo(() => resolved.filter((r) => isActiveDelivery(r, todayIso)), [resolved, todayIso]);
+  const todayTotals = useMemo(() => summarise(resolved.filter((r) => r.d.dueDate === todayIso), todayIso), [resolved, todayIso]);
+  const allTotals = useMemo(() => summarise(resolved, todayIso), [resolved, todayIso]);
+
+  const deliveredToday = todayTotals.completedToday;
+  const pendingDeliveries = todayTotals.pending + todayTotals.awaitingDispatch;
+  const atRiskDeliveries = todayTotals.atRisk;
+  const lateDeliveries = allTotals.late;
+  const blockedDeliveries = todayTotals.blocked;
+  const showCommandCentre = ["general_manager", "admin", "ops_manager"].includes(role);
 
   const openTask = tasks.find((t) => t.id === openTaskId) ?? null;
   const taskAudit = audit.filter((a) => a.entityType === "task" && a.entityId === openTaskId);
@@ -714,7 +516,7 @@ export function CospharmDashboard() {
     <div className="min-h-screen bg-background text-foreground">
       <Header role={role} setRole={setRole} user={currentUser} />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Operations dashboard</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -735,7 +537,7 @@ export function CospharmDashboard() {
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-          <TabsList className="flex w-full flex-wrap sm:inline-flex">
+          <TabsList className="flex w-full flex-wrap sm:inline-flex print:hidden">
             <TabsTrigger value="overview" className="gap-1.5"><LayoutDashboard className="size-4" /> Overview</TabsTrigger>
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Assignments</TabsTrigger>
@@ -758,6 +560,30 @@ export function CospharmDashboard() {
 
           {/* ============ OVERVIEW ============ */}
           <TabsContent value="overview" className="space-y-6">
+            {showCommandCentre ? (
+              <CommandCentre
+                now={now}
+                userName={currentUser.name}
+                resolved={resolved}
+                todayIso={todayIso}
+                tasks={tasks}
+                stock={stock}
+                emergencyOrders={emergencyOrders}
+                alerts={alerts}
+                audit={audit}
+                onOpenDelivery={setOpenDeliveryId}
+                onOpenTask={setOpenTaskId}
+                onOpenStock={(id) => { const s = stock.find((x) => x.id === id); if (s) setStockDialog(s); }}
+                onOpenEmergency={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+              />
+            ) : null}
+            {showCommandCentre ? (
+              <div className="flex items-center gap-3 pt-2">
+                <Separator className="flex-1" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Operational detail</span>
+                <Separator className="flex-1" />
+              </div>
+            ) : null}
             <EmergencyOrdersBanner
               deliveries={deliveries}
               emergencyOrders={emergencyOrders}
@@ -771,7 +597,7 @@ export function CospharmDashboard() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
-              <DeliveryRiskPanel items={deliveriesWithRisk} onOpen={setOpenDeliveryId} className="lg:col-span-2" />
+              <DeliveryRiskPanel items={deliveriesWithRisk.filter((x) => x.d.dueDate >= todayIso || !["DELIVERED", "DISPATCHED"].includes(x.d.status))} onOpen={setOpenDeliveryId} className="lg:col-span-2" />
               <CriticalActionsQueue items={criticalActions} onOpenTask={setOpenTaskId} onOpenDelivery={setOpenDeliveryId} onOpenStock={(id) => { const s = stock.find((x) => x.id === id); if (s) setStockDialog(s); }} />
             </div>
 
@@ -925,13 +751,13 @@ export function CospharmDashboard() {
                 <IntelligenceModule
                   inputs={{
                     deliveries, tasks, stock, counts, damages, kyc, audit, alerts, comments,
-                    staffCount: STAFF.length,
+                    staffCount: STAFF_ROSTER.length,
                   }}
                 />
               </TabsContent>
               <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
               <TabsContent value="performance">
-                <PerformanceReport deliveries={deliveries} audit={audit} />
+                <PerformanceReport resolved={resolved} audit={audit} todayIso={todayIso} />
               </TabsContent>
               <TabsContent value="digest">
                 <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
@@ -945,11 +771,11 @@ export function CospharmDashboard() {
               records={kyc}
               deliveries={deliveries}
               role={role}
-              licenses={SEED_LICENSES}
-              zones={SEED_ZONES}
-              batches={SEED_BATCHES}
-              controlled={SEED_CONTROLLED}
-              inspection={SEED_INSPECTION}
+              licenses={seed.licenses}
+              zones={seed.zones}
+              batches={seed.batches}
+              controlled={seed.inspection ? seed.controlled : seed.controlled}
+              inspection={seed.inspection}
               onSetStatus={setKycStatus}
               onOpenDelivery={setOpenDeliveryId}
             />
@@ -986,15 +812,17 @@ export function CospharmDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {STAFF.map((p) => {
-                        const health: Status = p.tasksPending === 0 ? "green" : p.tasksPending > 1 ? "red" : "yellow";
+                      {STAFF_ROSTER.map((p) => {
+                        const done = tasks.filter((t) => t.assignee === p.name && t.status === "green").length;
+                        const pending = tasks.filter((t) => t.assignee === p.name && t.status !== "green").length;
+                        const health: Status = pending === 0 ? "green" : pending > 1 ? "red" : "yellow";
                         return (
                           <TableRow key={p.name}>
                             <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.role}</TableCell>
-                            <TableCell className="text-sm">{p.shift}</TableCell>
-                            <TableCell className="text-sm">{p.tasksDone}</TableCell>
-                            <TableCell className="text-sm">{p.tasksPending}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{p.title}</TableCell>
+                            <TableCell className="text-sm">{p.shift ?? "All-day"}</TableCell>
+                            <TableCell className="text-sm">{done}</TableCell>
+                            <TableCell className="text-sm">{pending}</TableCell>
                             <TableCell className="text-right"><StatusBadge status={health} /></TableCell>
                           </TableRow>
                         );
@@ -1008,7 +836,7 @@ export function CospharmDashboard() {
         </Tabs>
 
         <footer className="mt-12 border-t pt-6 text-xs text-muted-foreground">
-          Prototype · Cospharm operations dashboard · data shown is illustrative.
+          Demonstration environment · Cospharm Operations Intelligence Platform · the dataset shown is illustrative and contains no financial values.
         </footer>
       </main>
 
@@ -1056,7 +884,7 @@ function prev_steps_for(next: Delivery, list: Delivery[]) {
 function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => void; user: CurrentUser }) {
   const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2);
   return (
-    <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <img src={cospharmLogo.url} alt="Cospharm logo" className="size-11 object-contain" />
