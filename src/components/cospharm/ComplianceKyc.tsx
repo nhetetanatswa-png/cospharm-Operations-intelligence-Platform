@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, FileWarning, Search, ShieldCheck, Ban } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 import { RegulatoryModule } from "./RegulatoryModule";
+import { RegulatoryOperations } from "./regulatory/RegulatoryOperations";
 import {
   daysUntil, expiringDocuments, isBlocking, KYC_LABEL, kycTone,
   type KycRecord, type KycStatus,
@@ -80,6 +81,7 @@ export function ComplianceKyc({
           <TabsTrigger value="exposure">Order exposure</TabsTrigger>
           <TabsTrigger value="expiries">Document expiries</TabsTrigger>
           <TabsTrigger value="facility">Facility compliance</TabsTrigger>
+          <TabsTrigger value="operations">Regulatory operations</TabsTrigger>
         </TabsList>
 
         <TabsContent value="register">
@@ -207,6 +209,10 @@ export function ComplianceKyc({
             inspection={inspection}
             deliveries={deliveries}
           />
+        </TabsContent>
+
+        <TabsContent value="operations">
+          <RegulatoryOperations role={role} actor={role} />
         </TabsContent>
       </Tabs>
     </div>
