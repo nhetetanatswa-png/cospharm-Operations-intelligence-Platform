@@ -18,7 +18,7 @@ export const STAFF_ROSTER: StaffMember[] = [
   { name: "Alaska", title: "Regulatory", role: "regulatory", shift: "All-day" },
   { name: "Pearl", title: "Front Desk", role: "front_desk", shift: "Morning" },
   { name: "Kells", title: "General Manager", role: "general_manager", shift: "All-day" },
-  { name: "Mothusi", title: "IT", role: "admin", shift: "All-day" },
+  { name: "Kealeboga", title: "IT", role: "admin", shift: "All-day" },
   { name: "Mpho", title: "Procurement Manager", role: "procurement", shift: "All-day" },
   { name: "Nametso", title: "HR", role: "hr", shift: "All-day" },
   { name: "Sofia", title: "Telesales", role: "telesales", shift: "Morning" },
