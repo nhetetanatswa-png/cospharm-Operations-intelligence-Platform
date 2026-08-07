@@ -314,7 +314,7 @@ export function buildRegulatorySeed(nowMs: number): RegulatoryState {
       uploadedBy: s.owner,
       uploadedAt: iso(nowMs - (s.openedDaysAgo - 2) * DAY),
       reviewStatus: "reviewed",
-      approvalStatus: s.actualSubmissionAt ? "submitted" : "approved",
+      approvalStatus: s.submittedDaysAgo !== undefined ? "submitted" : "approved",
       effectiveDate: day(nowMs - (s.openedDaysAgo - 2) * DAY),
       stage: stageList[0],
     });
