@@ -463,9 +463,6 @@ function DashboardInner({ now }: { now: number }) {
   const taskStats = useMemo(() => countByStatus(visibleTasks.map((t) => t.status)), [visibleTasks]);
   const stockStats = useMemo(() => countByStatus(stock.map((s) => s.status)), [stock]);
 
-  const filteredTasks = visibleTasks.filter((t) =>
-    [t.title, t.assignee, t.id].join(" ").toLowerCase().includes(search.toLowerCase()),
-  );
   const filteredStock = stock.filter((s) =>
     [s.name, s.sku, s.category].join(" ").toLowerCase().includes(search.toLowerCase()),
   );
