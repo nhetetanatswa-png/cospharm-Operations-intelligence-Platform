@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Download, Lock, Plus, Printer, RotateCcw } from "lucide-react";
+import { Download, Lock, Plus, Printer, RotateCcw, ShieldCheck } from "lucide-react";
 import { formatDay, useHydratedNow } from "../clock";
 import { STAFF_ROSTER } from "../staff";
 import type { Role } from "../types";
@@ -21,6 +21,10 @@ import {
 import { workingDaysUntil } from "./workdays";
 import { Bar, EmptyState, KpiCard, PartyChip, RagBadge } from "./RegBits";
 import { RegOverview } from "./RegOverview";
+import { AUDIT_TYPE_LABEL, sealedTimeline, timelineSeal, verifyTimeline } from "./audit-chain";
+import { CONFIDENCE_LABEL, forecastAll } from "./forecast";
+import { loadKyc, KYC_LABEL, kycTone } from "../kyc";
+import { StatusBadge } from "../StatusBadge";
 import type { ProcessType, Rag, RegulatoryCase, RegulatoryQuery, ResponsibleParty } from "./types";
 
 const REG_OWNERS = STAFF_ROSTER.filter((s) => s.role === "regulatory").map((s) => s.name);
@@ -291,7 +295,12 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
   const docs = state.documents.filter((d) => d.caseId === c.id);
   const tasks = state.tasks.filter((t) => t.caseId === c.id);
   const comments = state.comments.filter((x) => x.caseId === c.id);
-  const audit = state.audit.filter((a) => a.caseId === c.id);
+  const timeline = useMemo(() => sealedTimeline(state.audit, c.id), [state.audit, c.id]);
+  const sealValid = useMemo(() => verifyTimeline(timeline), [timeline]);
+  const kycRecord = useMemo(() => {
+    if (!c.requesterName) return null;
+    return loadKyc().find((r) => r.customer === c.requesterName) ?? null;
+  }, [c.requesterName]);
 
   if (sensitiveBlocked) {
     return (
@@ -374,15 +383,31 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
           ))}
         </Section>
 
-        <Section title="Audit trail">
-          <div className="space-y-1">
-            {audit.map((a) => (
-              <div key={a.id} className="rounded-md border px-2 py-1 text-[11px]">
-                <span className="font-medium">{a.type.replace(/\./g, " ")}</span> — {a.summary}
-                <span className="block text-muted-foreground">{formatDay(a.at)} · {a.actor}</span>
-              </div>
-            ))}
+        <Section title="Audit timeline (immutable)">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-secondary/40 px-2 py-1 text-[11px]">
+            <span className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="size-3.5" />
+              {timeline.length} sealed {timeline.length === 1 ? "entry" : "entries"} · seal {timelineSeal(timeline)}
+            </span>
+            <span className={sealValid ? "text-status-green" : "text-status-red"}>
+              {sealValid ? "Chain verified — append-only" : "Chain broken — records were altered"}
+            </span>
           </div>
+          {timeline.length === 0 ? <EmptyState message="No audit entries yet." /> : (
+            <ol className="space-y-1">
+              {[...timeline].reverse().map((a) => (
+                <li key={a.id} className="rounded-md border px-2 py-1 text-[11px]">
+                  <span className="font-medium">#{a.seq} {AUDIT_TYPE_LABEL[a.type]}</span> — {a.summary}
+                  <span className="block text-muted-foreground">
+                    {formatDay(a.at)} · {a.actor} · checksum {a.checksum} ← {a.previousChecksum}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Entries are append-only and hash-chained; each checksum covers the previous one, so edits or deletions break the seal. Included in every CSV export.
+          </p>
         </Section>
       </div>
 
@@ -402,6 +427,17 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
             <Row k="Decision" v={c.decisionAt ? `${formatDay(c.decisionAt)} — ${c.outcome ?? ""}` : "—"} />
             {c.conditions ? <Row k="Conditions" v={c.conditions} /> : null}
             {c.bomraReference ? <Row k="BoMRA reference" v={c.bomraReference} /> : null}
+            {c.requesterName ? (
+              <Row
+                k="Requesting customer"
+                v={
+                  <span className="flex items-center gap-2">
+                    {c.requesterName}
+                    {kycRecord ? <StatusBadge status={kycTone(kycRecord.status)} label={KYC_LABEL[kycRecord.status]} /> : <span className="text-muted-foreground">not on KYC register</span>}
+                  </span>
+                }
+              />
+            ) : null}
           </div>
         </Section>
 
@@ -611,20 +647,57 @@ function QueriesTab({ store, nowMs, canEdit, onOpenCase }: { store: Store; nowMs
 function ReportsTab({ store, nowMs }: { store: Store; nowMs: number }) {
   const state = store.state!;
   const m = computeMetrics({ cases: state.cases, tasks: state.tasks, queries: state.queries, nowMs, holidays: state.holidays });
+  const forecasts = useMemo(() => forecastAll({ state, nowMs }), [state, nowMs]);
 
-  const exportCsv = () => {
-    const header = ["Case number", "Process", "Pathway", "Title", "Product", "Manufacturer", "Owner", "Stage", "Responsible", "Status", "Internal due", "Regulatory due", "Submitted", "Decision", "Outcome"];
-    const lines = state.cases.map((c) =>
-      [c.caseNumber, c.processType, c.subtypeOrPathway, c.title, c.productName, c.manufacturerName, c.caseOwnerId, c.currentStage, c.currentResponsibleParty, c.status, c.internalDueAt ?? "", c.regulatoryDueAt ?? "", c.actualSubmissionAt ?? "", c.decisionAt ?? "", c.outcome ?? ""]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","),
-    );
-    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+  const download = (name: string, rows: (string | number)[][]) => {
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cospharm-regulatory-cases-${new Date(nowMs).toISOString().slice(0, 10)}.csv`;
+    a.download = `${name}-${new Date(nowMs).toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = () => {
+    const header = ["Case number", "Process", "Pathway", "Title", "Product", "Manufacturer", "Requesting customer", "Owner", "Stage", "Responsible", "Status", "Internal due", "Regulatory due", "Submitted", "Decision", "Outcome", "Audit entries", "Last audit event", "Audit seal", "Audit chain verified"];
+    const rows = state.cases.map((c) => {
+      const tl = sealedTimeline(state.audit, c.id);
+      const last = tl[tl.length - 1];
+      return [
+        c.caseNumber, c.processType, c.subtypeOrPathway, c.title, c.productName, c.manufacturerName,
+        c.requesterName ?? "", c.caseOwnerId, c.currentStage, c.currentResponsibleParty, c.status,
+        c.internalDueAt ?? "", c.regulatoryDueAt ?? "", c.actualSubmissionAt ?? "", c.decisionAt ?? "", c.outcome ?? "",
+        tl.length, last ? `${last.at} ${AUDIT_TYPE_LABEL[last.type]}: ${last.summary}` : "",
+        timelineSeal(tl), verifyTimeline(tl) ? "yes" : "NO",
+      ];
+    });
+    download("cospharm-regulatory-cases", [header, ...rows]);
+  };
+
+  const exportAuditCsv = () => {
+    const header = ["Case number", "Entry #", "Timestamp", "Actor", "Event type", "Summary", "Checksum", "Previous checksum", "Chain verified"];
+    const rows: (string | number)[][] = [];
+    for (const c of state.cases) {
+      const tl = sealedTimeline(state.audit, c.id);
+      const ok = verifyTimeline(tl) ? "yes" : "NO";
+      for (const e of tl) {
+        rows.push([c.caseNumber, e.seq, e.at, e.actor, AUDIT_TYPE_LABEL[e.type], e.summary, e.checksum, e.previousChecksum, ok]);
+      }
+    }
+    download("cospharm-regulatory-audit-timeline", [header, ...rows]);
+  };
+
+  const exportForecastCsv = () => {
+    const header = ["Process", "Backlog now", "Overdue now", "Backlog +30d", "Backlog +60d", "Backlog +90d", "Forecast breaches +30d", "Forecast breaches +60d", "Throughput / working day", "Arrivals / working day", "Clearance (working days)", "Median cycle (days)", "Confidence", "Confidence basis", "Method", "Data-quality notes"];
+    const rows = forecasts.map((f) => [
+      f.label, f.backlogNow, f.overdueNow, f.backlogIn30, f.backlogIn60, f.backlogIn90, f.overdueIn30, f.overdueIn60,
+      f.throughputPerWorkingDay.toFixed(3), f.arrivalPerWorkingDay.toFixed(3),
+      f.clearanceWorkingDays ?? "n/a", f.medianCycleDays ?? "n/a",
+      CONFIDENCE_LABEL[f.confidence], f.confidenceReason, f.basis, f.dataQuality.join(" | "),
+    ]);
+    download("cospharm-regulatory-forecast", [header, ...rows]);
   };
 
   const byMonth = useMemo(() => {
@@ -649,8 +722,51 @@ function ReportsTab({ store, nowMs }: { store: Store; nowMs: number }) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={exportCsv}><Download className="mr-1 size-3.5" /> Export case register (CSV)</Button>
+        <Button size="sm" variant="outline" onClick={exportAuditCsv}><Download className="mr-1 size-3.5" /> Export audit timeline (CSV)</Button>
+        <Button size="sm" variant="outline" onClick={exportForecastCsv}><Download className="mr-1 size-3.5" /> Export forecast (CSV)</Button>
         <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="mr-1 size-3.5" /> Print summary</Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Backlog and overdue forecast by process</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Deterministic projection: observed arrivals and completions over the trailing 180 working-day window, applied to 30/60/90-day horizons. The same register always produces the same numbers.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 lg:grid-cols-3">
+          {forecasts.map((f) => (
+            <div key={f.processType} className="rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{f.label}</p>
+                <StatusBadge
+                  status={f.confidence === "high" ? "green" : f.confidence === "moderate" ? "yellow" : "red"}
+                  label={CONFIDENCE_LABEL[f.confidence]}
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <Metric label="Backlog now" value={String(f.backlogNow)} />
+                <Metric label="Overdue now" value={String(f.overdueNow)} />
+                <Metric label="Backlog +30d" value={String(f.backlogIn30)} />
+                <Metric label="Backlog +60d" value={String(f.backlogIn60)} />
+                <Metric label="Backlog +90d" value={String(f.backlogIn90)} />
+                <Metric label="Breaches +30d" value={String(f.overdueIn30)} />
+                <Metric label="Breaches +60d" value={String(f.overdueIn60)} />
+                <Metric label="Clearance" value={f.clearanceWorkingDays === null ? "no throughput" : `${f.clearanceWorkingDays} wd`} />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Throughput {f.throughputPerWorkingDay.toFixed(2)}/wd · arrivals {f.arrivalPerWorkingDay.toFixed(2)}/wd · median cycle {f.medianCycleDays ?? "—"} days
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{f.confidenceReason}</p>
+              <p className="mt-2 text-[11px] font-medium">Data quality</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                {f.dataQuality.map((d) => <li key={d}>{d}</li>)}
+              </ul>
+              <p className="mt-2 text-[10px] text-muted-foreground">{f.basis}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="On-time milestones" value={pct(m.onTimeControllableMilestoneRate)} sub={`${m.onTimeControllableMilestoneRate.numerator}/${m.onTimeControllableMilestoneRate.denominator}`} />
