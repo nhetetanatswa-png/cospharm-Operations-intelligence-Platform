@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Download, Lock, Plus, Printer, RotateCcw } from "lucide-react";
+import { Download, Lock, Plus, Printer, RotateCcw, ShieldCheck } from "lucide-react";
 import { formatDay, useHydratedNow } from "../clock";
 import { STAFF_ROSTER } from "../staff";
 import type { Role } from "../types";
@@ -21,6 +21,10 @@ import {
 import { workingDaysUntil } from "./workdays";
 import { Bar, EmptyState, KpiCard, PartyChip, RagBadge } from "./RegBits";
 import { RegOverview } from "./RegOverview";
+import { AUDIT_TYPE_LABEL, sealedTimeline, timelineSeal, verifyTimeline } from "./audit-chain";
+import { CONFIDENCE_LABEL, forecastAll } from "./forecast";
+import { loadKyc, KYC_LABEL, kycTone } from "../kyc";
+import { StatusBadge } from "../StatusBadge";
 import type { ProcessType, Rag, RegulatoryCase, RegulatoryQuery, ResponsibleParty } from "./types";
 
 const REG_OWNERS = STAFF_ROSTER.filter((s) => s.role === "regulatory").map((s) => s.name);
@@ -291,7 +295,12 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
   const docs = state.documents.filter((d) => d.caseId === c.id);
   const tasks = state.tasks.filter((t) => t.caseId === c.id);
   const comments = state.comments.filter((x) => x.caseId === c.id);
-  const audit = state.audit.filter((a) => a.caseId === c.id);
+  const timeline = useMemo(() => sealedTimeline(state.audit, c.id), [state.audit, c.id]);
+  const sealValid = useMemo(() => verifyTimeline(timeline), [timeline]);
+  const kycRecord = useMemo(() => {
+    if (!c.requesterName) return null;
+    return loadKyc().find((r) => r.customer === c.requesterName) ?? null;
+  }, [c.requesterName]);
 
   if (sensitiveBlocked) {
     return (
@@ -374,15 +383,31 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
           ))}
         </Section>
 
-        <Section title="Audit trail">
-          <div className="space-y-1">
-            {audit.map((a) => (
-              <div key={a.id} className="rounded-md border px-2 py-1 text-[11px]">
-                <span className="font-medium">{a.type.replace(/\./g, " ")}</span> — {a.summary}
-                <span className="block text-muted-foreground">{formatDay(a.at)} · {a.actor}</span>
-              </div>
-            ))}
+        <Section title="Audit timeline (immutable)">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-secondary/40 px-2 py-1 text-[11px]">
+            <span className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="size-3.5" />
+              {timeline.length} sealed {timeline.length === 1 ? "entry" : "entries"} · seal {timelineSeal(timeline)}
+            </span>
+            <span className={sealValid ? "text-status-green" : "text-status-red"}>
+              {sealValid ? "Chain verified — append-only" : "Chain broken — records were altered"}
+            </span>
           </div>
+          {timeline.length === 0 ? <EmptyState message="No audit entries yet." /> : (
+            <ol className="space-y-1">
+              {[...timeline].reverse().map((a) => (
+                <li key={a.id} className="rounded-md border px-2 py-1 text-[11px]">
+                  <span className="font-medium">#{a.seq} {AUDIT_TYPE_LABEL[a.type]}</span> — {a.summary}
+                  <span className="block text-muted-foreground">
+                    {formatDay(a.at)} · {a.actor} · checksum {a.checksum} ← {a.previousChecksum}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Entries are append-only and hash-chained; each checksum covers the previous one, so edits or deletions break the seal. Included in every CSV export.
+          </p>
         </Section>
       </div>
 
@@ -402,6 +427,17 @@ function CaseDetail({ c, store, nowMs, role }: { c: RegulatoryCase; store: Store
             <Row k="Decision" v={c.decisionAt ? `${formatDay(c.decisionAt)} — ${c.outcome ?? ""}` : "—"} />
             {c.conditions ? <Row k="Conditions" v={c.conditions} /> : null}
             {c.bomraReference ? <Row k="BoMRA reference" v={c.bomraReference} /> : null}
+            {c.requesterName ? (
+              <Row
+                k="Requesting customer"
+                v={
+                  <span className="flex items-center gap-2">
+                    {c.requesterName}
+                    {kycRecord ? <StatusBadge status={kycTone(kycRecord.status)} label={KYC_LABEL[kycRecord.status]} /> : <span className="text-muted-foreground">not on KYC register</span>}
+                  </span>
+                }
+              />
+            ) : null}
           </div>
         </Section>
 
