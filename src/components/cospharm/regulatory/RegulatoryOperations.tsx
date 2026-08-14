@@ -647,20 +647,57 @@ function QueriesTab({ store, nowMs, canEdit, onOpenCase }: { store: Store; nowMs
 function ReportsTab({ store, nowMs }: { store: Store; nowMs: number }) {
   const state = store.state!;
   const m = computeMetrics({ cases: state.cases, tasks: state.tasks, queries: state.queries, nowMs, holidays: state.holidays });
+  const forecasts = useMemo(() => forecastAll({ state, nowMs }), [state, nowMs]);
 
-  const exportCsv = () => {
-    const header = ["Case number", "Process", "Pathway", "Title", "Product", "Manufacturer", "Owner", "Stage", "Responsible", "Status", "Internal due", "Regulatory due", "Submitted", "Decision", "Outcome"];
-    const lines = state.cases.map((c) =>
-      [c.caseNumber, c.processType, c.subtypeOrPathway, c.title, c.productName, c.manufacturerName, c.caseOwnerId, c.currentStage, c.currentResponsibleParty, c.status, c.internalDueAt ?? "", c.regulatoryDueAt ?? "", c.actualSubmissionAt ?? "", c.decisionAt ?? "", c.outcome ?? ""]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","),
-    );
-    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+  const download = (name: string, rows: (string | number)[][]) => {
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cospharm-regulatory-cases-${new Date(nowMs).toISOString().slice(0, 10)}.csv`;
+    a.download = `${name}-${new Date(nowMs).toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = () => {
+    const header = ["Case number", "Process", "Pathway", "Title", "Product", "Manufacturer", "Requesting customer", "Owner", "Stage", "Responsible", "Status", "Internal due", "Regulatory due", "Submitted", "Decision", "Outcome", "Audit entries", "Last audit event", "Audit seal", "Audit chain verified"];
+    const rows = state.cases.map((c) => {
+      const tl = sealedTimeline(state.audit, c.id);
+      const last = tl[tl.length - 1];
+      return [
+        c.caseNumber, c.processType, c.subtypeOrPathway, c.title, c.productName, c.manufacturerName,
+        c.requesterName ?? "", c.caseOwnerId, c.currentStage, c.currentResponsibleParty, c.status,
+        c.internalDueAt ?? "", c.regulatoryDueAt ?? "", c.actualSubmissionAt ?? "", c.decisionAt ?? "", c.outcome ?? "",
+        tl.length, last ? `${last.at} ${AUDIT_TYPE_LABEL[last.type]}: ${last.summary}` : "",
+        timelineSeal(tl), verifyTimeline(tl) ? "yes" : "NO",
+      ];
+    });
+    download("cospharm-regulatory-cases", [header, ...rows]);
+  };
+
+  const exportAuditCsv = () => {
+    const header = ["Case number", "Entry #", "Timestamp", "Actor", "Event type", "Summary", "Checksum", "Previous checksum", "Chain verified"];
+    const rows: (string | number)[][] = [];
+    for (const c of state.cases) {
+      const tl = sealedTimeline(state.audit, c.id);
+      const ok = verifyTimeline(tl) ? "yes" : "NO";
+      for (const e of tl) {
+        rows.push([c.caseNumber, e.seq, e.at, e.actor, AUDIT_TYPE_LABEL[e.type], e.summary, e.checksum, e.previousChecksum, ok]);
+      }
+    }
+    download("cospharm-regulatory-audit-timeline", [header, ...rows]);
+  };
+
+  const exportForecastCsv = () => {
+    const header = ["Process", "Backlog now", "Overdue now", "Backlog +30d", "Backlog +60d", "Backlog +90d", "Forecast breaches +30d", "Forecast breaches +60d", "Throughput / working day", "Arrivals / working day", "Clearance (working days)", "Median cycle (days)", "Confidence", "Confidence basis", "Method", "Data-quality notes"];
+    const rows = forecasts.map((f) => [
+      f.label, f.backlogNow, f.overdueNow, f.backlogIn30, f.backlogIn60, f.backlogIn90, f.overdueIn30, f.overdueIn60,
+      f.throughputPerWorkingDay.toFixed(3), f.arrivalPerWorkingDay.toFixed(3),
+      f.clearanceWorkingDays ?? "n/a", f.medianCycleDays ?? "n/a",
+      CONFIDENCE_LABEL[f.confidence], f.confidenceReason, f.basis, f.dataQuality.join(" | "),
+    ]);
+    download("cospharm-regulatory-forecast", [header, ...rows]);
   };
 
   const byMonth = useMemo(() => {
@@ -685,8 +722,51 @@ function ReportsTab({ store, nowMs }: { store: Store; nowMs: number }) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={exportCsv}><Download className="mr-1 size-3.5" /> Export case register (CSV)</Button>
+        <Button size="sm" variant="outline" onClick={exportAuditCsv}><Download className="mr-1 size-3.5" /> Export audit timeline (CSV)</Button>
+        <Button size="sm" variant="outline" onClick={exportForecastCsv}><Download className="mr-1 size-3.5" /> Export forecast (CSV)</Button>
         <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="mr-1 size-3.5" /> Print summary</Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Backlog and overdue forecast by process</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Deterministic projection: observed arrivals and completions over the trailing 180 working-day window, applied to 30/60/90-day horizons. The same register always produces the same numbers.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 lg:grid-cols-3">
+          {forecasts.map((f) => (
+            <div key={f.processType} className="rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{f.label}</p>
+                <StatusBadge
+                  status={f.confidence === "high" ? "green" : f.confidence === "moderate" ? "yellow" : "red"}
+                  label={CONFIDENCE_LABEL[f.confidence]}
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <Metric label="Backlog now" value={String(f.backlogNow)} />
+                <Metric label="Overdue now" value={String(f.overdueNow)} />
+                <Metric label="Backlog +30d" value={String(f.backlogIn30)} />
+                <Metric label="Backlog +60d" value={String(f.backlogIn60)} />
+                <Metric label="Backlog +90d" value={String(f.backlogIn90)} />
+                <Metric label="Breaches +30d" value={String(f.overdueIn30)} />
+                <Metric label="Breaches +60d" value={String(f.overdueIn60)} />
+                <Metric label="Clearance" value={f.clearanceWorkingDays === null ? "no throughput" : `${f.clearanceWorkingDays} wd`} />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Throughput {f.throughputPerWorkingDay.toFixed(2)}/wd · arrivals {f.arrivalPerWorkingDay.toFixed(2)}/wd · median cycle {f.medianCycleDays ?? "—"} days
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{f.confidenceReason}</p>
+              <p className="mt-2 text-[11px] font-medium">Data quality</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                {f.dataQuality.map((d) => <li key={d}>{d}</li>)}
+              </ul>
+              <p className="mt-2 text-[10px] text-muted-foreground">{f.basis}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="On-time milestones" value={pct(m.onTimeControllableMilestoneRate)} sub={`${m.onTimeControllableMilestoneRate.numerator}/${m.onTimeControllableMilestoneRate.denominator}`} />
