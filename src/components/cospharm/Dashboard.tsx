@@ -538,19 +538,10 @@ function DashboardInner({ now }: { now: number }) {
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Inventory</TabsTrigger>
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
-              <Megaphone className="size-4" /> Marketer
-            </TabsTrigger>
-            <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
-              <Shield className="size-4" /> Compliance
-            </TabsTrigger>
-            <TabsTrigger value="presence" className="gap-1.5">
-              <UserCheck className="size-4" /> Capacity
+              <Megaphone className="size-4" /> Marketers
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
-            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Intelligence</TabsTrigger>
-            <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
-              <UserCog className="size-4" /> Admin
-            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
           </TabsList>
 
           {/* ============ OVERVIEW ============ */}
