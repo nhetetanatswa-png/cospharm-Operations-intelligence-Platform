@@ -8,14 +8,12 @@ import {
   CalendarDays,
   History,
   LayoutDashboard,
-  Lock,
   Megaphone,
   Package,
   Plus,
   Search,
   ShieldCheck,
   Truck,
-  UserCog,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,17 +44,13 @@ import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTOR
 import { NotesDigest } from "./NotesDigest";
 import { PerformanceReport } from "./PerformanceReport";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
-import { RegulatoryModule } from "./RegulatoryModule";
-import { Shield, UserCheck } from "lucide-react";
 import { TimedDeliveries } from "./TimedDeliveries";
-import { PresenceBoard } from "./PresenceBoard";
 import { DeliveryRiskPanel } from "./DeliveryRiskPanel";
 import { InventoryIntegrity } from "./InventoryIntegrity";
-import { CapacityCoverage } from "./CapacityCoverage";
-import { ComplianceKyc } from "./ComplianceKyc";
+import type { ImportedRow } from "./InventoryImport";
 import { IntelligenceModule } from "./IntelligenceModule";
 import { loadCounts, loadDamages, type DamageRecord, type InventoryCount } from "./inventory";
-import { loadKyc, saveKyc, type KycRecord, type KycStatus } from "./kyc";
+import { loadKyc, type KycRecord } from "./kyc";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -166,14 +160,6 @@ function DashboardInner({ now }: { now: number }) {
     setDamages(loadDamages(seed.stock));
     setKyc(loadKyc());
   }, []);
-
-  function setKycStatus(customer: string, status: KycStatus) {
-    setKyc((prev) => {
-      const next = prev.map((r) => (r.customer === customer ? { ...r, status, lastReviewed: new Date().toISOString().slice(0, 10) } : r));
-      saveKyc(next);
-      return next;
-    });
-  }
 
   // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
@@ -286,6 +272,48 @@ function DashboardInner({ now }: { now: number }) {
     );
     logAudit({ entityType: "task", entityId: task.id, entityLabel: task.title, field: "status", oldValue: "yellow (pending verification)", newValue: "green (verified)", comment: `Verified by ${currentUser.name}` });
     pushActivity({ kind: "verification", message: `Verified ${task.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function importStock(rows: ImportedRow[], sheet: string, fileName: string) {
+    let added = 0;
+    let updated = 0;
+    setStock((prev) => {
+      const bySku = new Map(prev.map((s) => [s.sku, s] as const));
+      for (const r of rows) {
+        const existing = bySku.get(r.sku);
+        const status: Status = r.onHand <= 0 || r.onHand < 20 ? "red" : r.reorder > 0 && r.onHand < r.reorder ? "yellow" : "green";
+        if (existing) {
+          updated += 1;
+          bySku.set(r.sku, { ...existing, name: r.name, category: r.category, onHand: r.onHand, reorder: r.reorder || existing.reorder, capacity: Math.max(existing.capacity, r.capacity), expiry: r.expiry || existing.expiry, batch: r.batch ?? existing.batch, status });
+        } else {
+          added += 1;
+          bySku.set(r.sku, { id: r.id, sku: r.sku, name: r.name, category: r.category, onHand: r.onHand, reorder: r.reorder, capacity: r.capacity, expiry: r.expiry, batch: r.batch, status });
+        }
+      }
+      return Array.from(bySku.values());
+    });
+    logAudit({
+      entityType: "stock",
+      entityId: "IMPORT",
+      entityLabel: `Excel import · ${fileName}`,
+      field: "onHand",
+      oldValue: `${stock.length} items`,
+      newValue: `${added} added, ${updated} updated`,
+      comment: `Imported ${rows.length} rows from sheet "${sheet}".`,
+    });
+    pushActivity({ kind: "stock", message: `Inventory workbook imported (${rows.length} rows)`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function importStockFailed(fileName: string, reason: string) {
+    logAudit({
+      entityType: "stock",
+      entityId: "IMPORT",
+      entityLabel: `Failed Excel import · ${fileName}`,
+      field: "issue",
+      oldValue: "—",
+      newValue: "import failed",
+      comment: reason,
+    });
   }
 
   function updateStock(item: StockItem, next: { onHand: number; issue?: string; status: Status }, comment: string) {
@@ -538,19 +566,10 @@ function DashboardInner({ now }: { now: number }) {
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Inventory</TabsTrigger>
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
-              <Megaphone className="size-4" /> Marketer
-            </TabsTrigger>
-            <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
-              <Shield className="size-4" /> Compliance
-            </TabsTrigger>
-            <TabsTrigger value="presence" className="gap-1.5">
-              <UserCheck className="size-4" /> Capacity
+              <Megaphone className="size-4" /> Marketers
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
-            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Intelligence</TabsTrigger>
-            <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
-              <UserCog className="size-4" /> Admin
-            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
           </TabsList>
 
           {/* ============ OVERVIEW ============ */}
@@ -675,6 +694,8 @@ function DashboardInner({ now }: { now: number }) {
               role={role}
               onOpenStock={setStockDialog}
               onOpenDelivery={setOpenDeliveryId}
+              onImport={importStock}
+              onImportFailure={importStockFailed}
             />
           </TabsContent>
 
@@ -749,74 +770,6 @@ function DashboardInner({ now }: { now: number }) {
             </Tabs>
           </TabsContent>
 
-          {/* ============ REGULATORY ============ */}
-          <TabsContent value="regulatory">
-            <ComplianceKyc
-              records={kyc}
-              deliveries={deliveries}
-              role={role}
-              licenses={seed.licenses}
-              zones={seed.zones}
-              batches={seed.batches}
-              controlled={seed.inspection ? seed.controlled : seed.controlled}
-              inspection={seed.inspection}
-              onSetStatus={setKycStatus}
-              onOpenDelivery={setOpenDeliveryId}
-            />
-          </TabsContent>
-
-          {/* ============ PRESENCE & DELEGATION ============ */}
-          <TabsContent value="presence" className="space-y-4">
-            <CapacityCoverage deliveries={deliveries} tasks={tasks} activeAssignments={activeAssignments} />
-          </TabsContent>
-
-          {/* ============ ADMIN ============ */}
-          <TabsContent value="admin" className="space-y-6">
-            {!can(role, "users.manage") ? (
-              <Card>
-                <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
-                  <Lock className="size-4" /> Admin tools are restricted to administrators.
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Staff & accountability</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Done</TableHead>
-                        <TableHead>Pending</TableHead>
-                        <TableHead className="text-right">Health</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {STAFF_ROSTER.map((p) => {
-                        const done = tasks.filter((t) => t.assignee === p.name && t.status === "green").length;
-                        const pending = tasks.filter((t) => t.assignee === p.name && t.status !== "green").length;
-                        const health: Status = pending === 0 ? "green" : pending > 1 ? "red" : "yellow";
-                        return (
-                          <TableRow key={p.name}>
-                            <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.title}</TableCell>
-                            <TableCell className="text-sm">{p.shift ?? "All-day"}</TableCell>
-                            <TableCell className="text-sm">{done}</TableCell>
-                            <TableCell className="text-sm">{pending}</TableCell>
-                            <TableCell className="text-right"><StatusBadge status={health} /></TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
         </Tabs>
 
         <footer className="mt-12 border-t pt-6 text-xs text-muted-foreground">
