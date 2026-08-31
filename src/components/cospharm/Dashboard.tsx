@@ -47,6 +47,7 @@ import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { TimedDeliveries } from "./TimedDeliveries";
 import { DeliveryRiskPanel } from "./DeliveryRiskPanel";
 import { InventoryIntegrity } from "./InventoryIntegrity";
+import type { ImportedRow } from "./InventoryImport";
 import { IntelligenceModule } from "./IntelligenceModule";
 import { loadCounts, loadDamages, type DamageRecord, type InventoryCount } from "./inventory";
 import { loadKyc, type KycRecord } from "./kyc";
@@ -271,6 +272,48 @@ function DashboardInner({ now }: { now: number }) {
     );
     logAudit({ entityType: "task", entityId: task.id, entityLabel: task.title, field: "status", oldValue: "yellow (pending verification)", newValue: "green (verified)", comment: `Verified by ${currentUser.name}` });
     pushActivity({ kind: "verification", message: `Verified ${task.title}`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function importStock(rows: ImportedRow[], sheet: string, fileName: string) {
+    let added = 0;
+    let updated = 0;
+    setStock((prev) => {
+      const bySku = new Map(prev.map((s) => [s.sku, s] as const));
+      for (const r of rows) {
+        const existing = bySku.get(r.sku);
+        const status: Status = r.onHand <= 0 || r.onHand < 20 ? "red" : r.reorder > 0 && r.onHand < r.reorder ? "yellow" : "green";
+        if (existing) {
+          updated += 1;
+          bySku.set(r.sku, { ...existing, name: r.name, category: r.category, onHand: r.onHand, reorder: r.reorder || existing.reorder, capacity: Math.max(existing.capacity, r.capacity), expiry: r.expiry || existing.expiry, batch: r.batch ?? existing.batch, status });
+        } else {
+          added += 1;
+          bySku.set(r.sku, { id: r.id, sku: r.sku, name: r.name, category: r.category, onHand: r.onHand, reorder: r.reorder, capacity: r.capacity, expiry: r.expiry, batch: r.batch, status });
+        }
+      }
+      return Array.from(bySku.values());
+    });
+    logAudit({
+      entityType: "stock",
+      entityId: "IMPORT",
+      entityLabel: `Excel import · ${fileName}`,
+      field: "onHand",
+      oldValue: `${stock.length} items`,
+      newValue: `${added} added, ${updated} updated`,
+      comment: `Imported ${rows.length} rows from sheet "${sheet}".`,
+    });
+    pushActivity({ kind: "stock", message: `Inventory workbook imported (${rows.length} rows)`, actor: currentUser.name, role: currentUser.role });
+  }
+
+  function importStockFailed(fileName: string, reason: string) {
+    logAudit({
+      entityType: "stock",
+      entityId: "IMPORT",
+      entityLabel: `Failed Excel import · ${fileName}`,
+      field: "issue",
+      oldValue: "—",
+      newValue: "import failed",
+      comment: reason,
+    });
   }
 
   function updateStock(item: StockItem, next: { onHand: number; issue?: string; status: Status }, comment: string) {
@@ -651,6 +694,8 @@ function DashboardInner({ now }: { now: number }) {
               role={role}
               onOpenStock={setStockDialog}
               onOpenDelivery={setOpenDeliveryId}
+              onImport={importStock}
+              onImportFailure={importStockFailed}
             />
           </TabsContent>
 

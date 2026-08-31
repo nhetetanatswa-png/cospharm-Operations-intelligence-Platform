@@ -11,6 +11,7 @@ import {
   type DamageRecord, type InventoryCount,
 } from "./inventory";
 import type { Delivery, Role, StockItem } from "./types";
+import { InventoryImportDialog, type ImportedRow } from "./InventoryImport";
 import { can } from "./roles";
 
 function bwp(n: number) {
@@ -25,6 +26,8 @@ export function InventoryIntegrity({
   role,
   onOpenStock,
   onOpenDelivery,
+  onImport,
+  onImportFailure,
 }: {
   stock: StockItem[];
   counts: InventoryCount[];
@@ -33,6 +36,8 @@ export function InventoryIntegrity({
   role: Role;
   onOpenStock: (item: StockItem) => void;
   onOpenDelivery: (id: string) => void;
+  onImport: (rows: ImportedRow[], sheet: string, fileName: string) => void;
+  onImportFailure: (fileName: string, reason: string) => void;
 }) {
   const [tab, setTab] = useState("discrepancy");
   const discrepancies = useMemo(() => computeDiscrepancies(stock, counts), [stock, counts]);
@@ -48,6 +53,13 @@ export function InventoryIntegrity({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">Inventory</h2>
+          <p className="text-xs text-muted-foreground">Stock integrity, damages, expiry and reorder pressure.</p>
+        </div>
+        <InventoryImportDialog onImport={onImport} onFailure={onImportFailure} disabled={!canEdit} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard icon={<ScanLine className="size-5" />} label="Lines counted" value={discrepancies.length} sub="System vs warehouse vs customer" tone="green" />
         <MetricCard icon={<AlertTriangle className="size-5" />} label="Red discrepancies" value={red.length} sub="Gap of 10% or more" tone="red" />
