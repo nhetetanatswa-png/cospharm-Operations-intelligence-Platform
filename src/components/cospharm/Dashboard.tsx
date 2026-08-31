@@ -8,14 +8,12 @@ import {
   CalendarDays,
   History,
   LayoutDashboard,
-  Lock,
   Megaphone,
   Package,
   Plus,
   Search,
   ShieldCheck,
   Truck,
-  UserCog,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,17 +44,12 @@ import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTOR
 import { NotesDigest } from "./NotesDigest";
 import { PerformanceReport } from "./PerformanceReport";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
-import { RegulatoryModule } from "./RegulatoryModule";
-import { Shield, UserCheck } from "lucide-react";
 import { TimedDeliveries } from "./TimedDeliveries";
-import { PresenceBoard } from "./PresenceBoard";
 import { DeliveryRiskPanel } from "./DeliveryRiskPanel";
 import { InventoryIntegrity } from "./InventoryIntegrity";
-import { CapacityCoverage } from "./CapacityCoverage";
-import { ComplianceKyc } from "./ComplianceKyc";
 import { IntelligenceModule } from "./IntelligenceModule";
 import { loadCounts, loadDamages, type DamageRecord, type InventoryCount } from "./inventory";
-import { loadKyc, saveKyc, type KycRecord, type KycStatus } from "./kyc";
+import { loadKyc, type KycRecord } from "./kyc";
 import {
   deliveryStatusBadge,
   deriveDeliveryRisk,
@@ -166,14 +159,6 @@ function DashboardInner({ now }: { now: number }) {
     setDamages(loadDamages(seed.stock));
     setKyc(loadKyc());
   }, []);
-
-  function setKycStatus(customer: string, status: KycStatus) {
-    setKyc((prev) => {
-      const next = prev.map((r) => (r.customer === customer ? { ...r, status, lastReviewed: new Date().toISOString().slice(0, 10) } : r));
-      saveKyc(next);
-      return next;
-    });
-  }
 
   // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
