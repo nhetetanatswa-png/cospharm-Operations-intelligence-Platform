@@ -14,10 +14,227 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      inventory_audit_log: {
+        Row: {
+          action: string
+          actor_name: string
+          actor_role: string
+          created_at: string
+          detail: string | null
+          field_name: string | null
+          id: string
+          item_code: string | null
+          new_value: string | null
+          old_value: string | null
+          record_label: string | null
+          source: string
+        }
+        Insert: {
+          action: string
+          actor_name?: string
+          actor_role?: string
+          created_at?: string
+          detail?: string | null
+          field_name?: string | null
+          id?: string
+          item_code?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          record_label?: string | null
+          source?: string
+        }
+        Update: {
+          action?: string
+          actor_name?: string
+          actor_role?: string
+          created_at?: string
+          detail?: string | null
+          field_name?: string | null
+          id?: string
+          item_code?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          record_label?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
+      inventory_imports: {
+        Row: {
+          actor_name: string
+          created_at: string
+          failure_reason: string | null
+          file_name: string
+          id: string
+          rows_changed: number
+          rows_conflicted: number
+          rows_new: number
+          rows_read: number
+          rows_skipped: number
+          rows_unchanged: number
+          sheet_name: string | null
+          status: string
+        }
+        Insert: {
+          actor_name?: string
+          created_at?: string
+          failure_reason?: string | null
+          file_name: string
+          id?: string
+          rows_changed?: number
+          rows_conflicted?: number
+          rows_new?: number
+          rows_read?: number
+          rows_skipped?: number
+          rows_unchanged?: number
+          sheet_name?: string | null
+          status?: string
+        }
+        Update: {
+          actor_name?: string
+          created_at?: string
+          failure_reason?: string | null
+          file_name?: string
+          id?: string
+          rows_changed?: number
+          rows_conflicted?: number
+          rows_new?: number
+          rows_read?: number
+          rows_skipped?: number
+          rows_unchanged?: number
+          sheet_name?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      inventory_movements: {
+        Row: {
+          created_at: string
+          id: string
+          item_code: string
+          month_name: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_code: string
+          month_name: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_code?: string
+          month_name?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_item_code_fkey"
+            columns: ["item_code"]
+            isOneToOne: false
+            referencedRelation: "inventory_master"
+            referencedColumns: ["item_code"]
+          },
+          {
+            foreignKeyName: "inventory_movements_item_code_fkey"
+            columns: ["item_code"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["item_code"]
+          },
+        ]
+      }
+      inventory_products: {
+        Row: {
+          batch: string | null
+          created_at: string
+          data_flags: string[]
+          expiry_date: string | null
+          item_code: string
+          item_description: string
+          last_updated: string
+          monthly_target: number
+          notes: string | null
+          portfolio: string
+          qty_on_hand: number
+          unit_cost: number
+        }
+        Insert: {
+          batch?: string | null
+          created_at?: string
+          data_flags?: string[]
+          expiry_date?: string | null
+          item_code: string
+          item_description: string
+          last_updated?: string
+          monthly_target?: number
+          notes?: string | null
+          portfolio?: string
+          qty_on_hand?: number
+          unit_cost?: number
+        }
+        Update: {
+          batch?: string | null
+          created_at?: string
+          data_flags?: string[]
+          expiry_date?: string | null
+          item_code?: string
+          item_description?: string
+          last_updated?: string
+          monthly_target?: number
+          notes?: string | null
+          portfolio?: string
+          qty_on_hand?: number
+          unit_cost?: number
+        }
+        Relationships: []
+      }
+      inventory_settings: {
+        Row: {
+          id: boolean
+          months_included: number
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          months_included?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          months_included?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      inventory_master: {
+        Row: {
+          avg_monthly_movement: number | null
+          batch: string | null
+          data_flags: string[] | null
+          expiry_date: string | null
+          item_code: string | null
+          item_description: string | null
+          last_updated: string | null
+          monthly_target: number | null
+          months_holding: number | null
+          months_to_expiry: number | null
+          movement_status: string | null
+          near_expiry: string | null
+          notes: string | null
+          portfolio: string | null
+          priority_score: number | null
+          qty_on_hand: number | null
+          stock_status: string | null
+          stock_value: number | null
+          unit_cost: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
