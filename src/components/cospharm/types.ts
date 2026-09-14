@@ -50,12 +50,37 @@ export type StockItem = {
   damagedUnits?: number;
 };
 
+export type InventoryProduct = StockItem & {
+  unit: string;
+  packSize: string;
+  supplier: string;
+  location: string;
+  unitCost: number;
+  lastCounted: string;
+  active: boolean;
+};
+
+export type InventoryMovementType = "OPENING" | "RECEIPT" | "ISSUE" | "ADJUSTMENT" | "CLOSING";
+
+export type InventoryMovement = {
+  id: string;
+  productId: string;
+  sku: string;
+  month: string;
+  date: string;
+  type: InventoryMovementType;
+  quantity: number;
+  balance: number;
+  reference: string;
+  note?: string;
+};
+
 export type AuditEntry = {
   id: string;
   entityType: "task" | "stock";
   entityId: string;
   entityLabel: string;
-  field: "status" | "onHand" | "issue";
+  field: "status" | "onHand" | "issue" | "product" | "import";
   oldValue: string;
   newValue: string;
   user: string;
@@ -72,13 +97,7 @@ export type CurrentUser = {
 // ===== Operational workflow =====
 
 export type DeliveryStatus =
-  | "PENDING"
-  | "IN_PROGRESS"
-  | "AT_RISK"
-  | "BLOCKED"
-  | "DISPATCHED"
-  | "DELIVERED"
-  | "LATE";
+  "PENDING" | "IN_PROGRESS" | "AT_RISK" | "BLOCKED" | "DISPATCHED" | "DELIVERED" | "LATE";
 
 export type OperationStep = {
   stepNumber: number;
@@ -124,12 +143,7 @@ export type EmergencyOrderItem = {
 };
 
 export type EmergencyOrderStatus =
-  | "PENDING_APPROVAL"
-  | "APPROVED"
-  | "ASSIGNED_TO_DRIVER"
-  | "DISPATCHED"
-  | "DELIVERED"
-  | "CANCELLED";
+  "PENDING_APPROVAL" | "APPROVED" | "ASSIGNED_TO_DRIVER" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
 
 export type EmergencyOrder = {
   id: string;
@@ -150,12 +164,7 @@ export type EmergencyOrder = {
 };
 
 export type CommentType =
-  | "GENERAL"
-  | "DELIVERY_NOTE"
-  | "DELAY_REASON"
-  | "STOCK_NOTE"
-  | "CUSTOMER_NOTE"
-  | "SUPERVISOR_NOTE";
+  "GENERAL" | "DELIVERY_NOTE" | "DELAY_REASON" | "STOCK_NOTE" | "CUSTOMER_NOTE" | "SUPERVISOR_NOTE";
 
 export type Comment = {
   id: string;
@@ -264,12 +273,7 @@ export type FieldLogEntry = {
 };
 
 export type MarketingActivity =
-  | "SITE_VISIT"
-  | "SAMPLE_DROP"
-  | "PROMO_TALK"
-  | "TRAINING"
-  | "STOCK_CHECK"
-  | "TELESALES_CALL";
+  "SITE_VISIT" | "SAMPLE_DROP" | "PROMO_TALK" | "TRAINING" | "STOCK_CHECK" | "TELESALES_CALL";
 
 // ===== Regulatory =====
 export type RegulatoryStatus = "green" | "yellow" | "red";
@@ -352,7 +356,8 @@ export type LeaveRecord = {
   reason?: string;
 };
 
-export type AuthRequestType = "PROMO_RELEASE" | "PRICE_OVERRIDE" | "CREDIT_TERM" | "EMERGENCY_ORDER" | "TRAVEL" | "EXPENSE";
+export type AuthRequestType =
+  "PROMO_RELEASE" | "PRICE_OVERRIDE" | "CREDIT_TERM" | "EMERGENCY_ORDER" | "TRAVEL" | "EXPENSE";
 export type AuthRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type AuthorisationRequest = {
