@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -22,10 +22,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, StatusDot, type Status } from "./StatusBadge";
 import { TaskDetailSheet } from "./TaskDetailSheet";
@@ -41,11 +53,25 @@ import { MarketerModule } from "./MarketerModule";
 import { OperationsCalendar } from "./OperationsCalendar";
 import { can, ROLE_DESCRIPTION, ROLE_LABEL } from "./roles";
 import { ROLE_USERS_FULL, STAFF_ROSTER } from "./staff";
-import { ALL_CLIENTS, CLIENT_CONTACTS, HOSPITALS_AND_CLINICS, PHARMA_DISTRIBUTORS } from "./mockClients";
+import {
+  ALL_CLIENTS,
+  CLIENT_CONTACTS,
+  HOSPITALS_AND_CLINICS,
+  PHARMA_DISTRIBUTORS,
+} from "./mockClients";
 import { NotesDigest } from "./NotesDigest";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { RegulatoryModule } from "./RegulatoryModule";
 import { HRModule } from "./HRModule";
+import { InventoryModule, type ImportRow } from "./InventoryModule";
+import { INVENTORY_SEED_VERSION, PREPARED_MOVEMENTS, PREPARED_PRODUCTS } from "./inventoryData";
+import {
+  inventoryDatabaseConfigured,
+  loadInventoryDatabase,
+  saveInventoryProduct,
+  saveInventorySync,
+  seedPreparedInventoryDatabase,
+} from "./inventoryApi";
 import { Shield, HeartHandshake } from "lucide-react";
 import {
   deliveryStatusBadge,
@@ -79,11 +105,12 @@ import type {
   ColdChainZone,
   ControlledDrugLog,
   Inspection,
+  InventoryMovement,
+  InventoryProduct,
   LeaveRecord,
   License,
   StaffCertification,
 } from "./types";
-import cospharmLogo from "@/assets/cospharm-logo.png.asset.json";
 
 // ===== Seed data =====
 
@@ -91,76 +118,293 @@ const todayIso = new Date().toISOString().slice(0, 10);
 const yesterdayIso = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
 const INITIAL_TASKS: Task[] = [
-  { id: "T-1042", title: "Morning cold-chain temperature log", assignee: "Ada Bello", shift: "Morning", due: "07:30", status: "green", note: "All readings within range." },
-  { id: "T-1043", title: "Restock dispensary shelves A–C", assignee: "John Mensah", shift: "Morning", due: "09:00", status: "yellow", note: "Started — shelf C pending" },
-  { id: "T-1044", title: "Sign off overnight delivery manifest", assignee: "Mary Adeyemi", shift: "Morning", due: "08:00", status: "red", note: "Not signed — driver waiting" },
-  { id: "T-1045", title: "Controlled drugs cabinet count", assignee: "Grace Okoye", shift: "Morning", due: "10:00", status: "green", note: "Counts match register.", verifiedBy: "Mary Adeyemi", verifiedAt: new Date().toISOString() },
-  { id: "T-1046", title: "Clean & sanitise compounding bench", assignee: "Tunde Aliu", shift: "Afternoon", due: "13:00", status: "yellow", note: "In progress" },
-  { id: "T-1047", title: "Patient delivery batch #B-228", assignee: "John Mensah", shift: "Afternoon", due: "14:30", status: "red", note: "2 items short — see stock" },
-  { id: "T-1048", title: "Equipment calibration check", assignee: "Ada Bello", shift: "Afternoon", due: "15:00", status: "green", note: "Calibrated, certificate filed.", pendingVerification: true },
-  { id: "T-1049", title: "End-of-day handover log", assignee: "Mary Adeyemi", shift: "Night", due: "20:00", status: "yellow", note: "Awaiting pharmacist sign-off" },
+  {
+    id: "T-1042",
+    title: "Morning cold-chain temperature log",
+    assignee: "Ada Bello",
+    shift: "Morning",
+    due: "07:30",
+    status: "green",
+    note: "All readings within range.",
+  },
+  {
+    id: "T-1043",
+    title: "Restock dispensary shelves A–C",
+    assignee: "John Mensah",
+    shift: "Morning",
+    due: "09:00",
+    status: "yellow",
+    note: "Started — shelf C pending",
+  },
+  {
+    id: "T-1044",
+    title: "Sign off overnight delivery manifest",
+    assignee: "Mary Adeyemi",
+    shift: "Morning",
+    due: "08:00",
+    status: "red",
+    note: "Not signed — driver waiting",
+  },
+  {
+    id: "T-1045",
+    title: "Controlled drugs cabinet count",
+    assignee: "Grace Okoye",
+    shift: "Morning",
+    due: "10:00",
+    status: "green",
+    note: "Counts match register.",
+    verifiedBy: "Mary Adeyemi",
+    verifiedAt: new Date().toISOString(),
+  },
+  {
+    id: "T-1046",
+    title: "Clean & sanitise compounding bench",
+    assignee: "Tunde Aliu",
+    shift: "Afternoon",
+    due: "13:00",
+    status: "yellow",
+    note: "In progress",
+  },
+  {
+    id: "T-1047",
+    title: "Patient delivery batch #B-228",
+    assignee: "John Mensah",
+    shift: "Afternoon",
+    due: "14:30",
+    status: "red",
+    note: "2 items short — see stock",
+  },
+  {
+    id: "T-1048",
+    title: "Equipment calibration check",
+    assignee: "Ada Bello",
+    shift: "Afternoon",
+    due: "15:00",
+    status: "green",
+    note: "Calibrated, certificate filed.",
+    pendingVerification: true,
+  },
+  {
+    id: "T-1049",
+    title: "End-of-day handover log",
+    assignee: "Mary Adeyemi",
+    shift: "Night",
+    due: "20:00",
+    status: "yellow",
+    note: "Awaiting pharmacist sign-off",
+  },
 ];
 
 const INITIAL_STOCK: StockItem[] = [
-  { id: "S-001", name: "Paracetamol 500mg", sku: "PCM-500", category: "Analgesics", onHand: 1240, reorder: 400, capacity: 2000, expiry: "2027-04", status: "green", batch: "B-7741" },
-  { id: "S-002", name: "Amoxicillin 250mg", sku: "AMX-250", category: "Antibiotics", onHand: 320, reorder: 500, capacity: 1500, expiry: "2026-09", status: "yellow", issue: "Below reorder level", batch: "B-3320" },
-  { id: "S-003", name: "Insulin Glargine 100IU", sku: "INS-GLA", category: "Cold chain", onHand: 28, reorder: 60, capacity: 200, expiry: "2026-03", status: "red", issue: "Critically low — affects 3 deliveries", batch: "B-9011" },
-  { id: "S-004", name: "Salbutamol Inhaler", sku: "SAL-INH", category: "Respiratory", onHand: 145, reorder: 80, capacity: 300, expiry: "2026-11", status: "green", batch: "B-5520" },
-  { id: "S-005", name: "Metformin 500mg", sku: "MET-500", category: "Diabetes", onHand: 880, reorder: 300, capacity: 1500, expiry: "2027-01", status: "green", batch: "B-6610" },
-  { id: "S-006", name: "Ceftriaxone 1g Vial", sku: "CEF-1G", category: "Antibiotics", onHand: 60, reorder: 100, capacity: 400, expiry: "2026-02", status: "yellow", issue: "12 units damaged on receipt", batch: "B-4408", damagedUnits: 12 },
-  { id: "S-007", name: "Loratadine 10mg", sku: "LOR-10", category: "Antihistamines", onHand: 12, reorder: 150, capacity: 600, expiry: "2025-12", status: "red", issue: "Near expiry & critically low", batch: "B-2210" },
-  { id: "S-008", name: "ORS Sachets", sku: "ORS-S", category: "Rehydration", onHand: 540, reorder: 200, capacity: 1000, expiry: "2027-08", status: "green", batch: "B-8810" },
+  {
+    id: "S-001",
+    name: "Paracetamol 500mg",
+    sku: "PCM-500",
+    category: "Analgesics",
+    onHand: 1240,
+    reorder: 400,
+    capacity: 2000,
+    expiry: "2027-04",
+    status: "green",
+    batch: "B-7741",
+  },
+  {
+    id: "S-002",
+    name: "Amoxicillin 250mg",
+    sku: "AMX-250",
+    category: "Antibiotics",
+    onHand: 320,
+    reorder: 500,
+    capacity: 1500,
+    expiry: "2026-09",
+    status: "yellow",
+    issue: "Below reorder level",
+    batch: "B-3320",
+  },
+  {
+    id: "S-003",
+    name: "Insulin Glargine 100IU",
+    sku: "INS-GLA",
+    category: "Cold chain",
+    onHand: 28,
+    reorder: 60,
+    capacity: 200,
+    expiry: "2026-03",
+    status: "red",
+    issue: "Critically low — affects 3 deliveries",
+    batch: "B-9011",
+  },
+  {
+    id: "S-004",
+    name: "Salbutamol Inhaler",
+    sku: "SAL-INH",
+    category: "Respiratory",
+    onHand: 145,
+    reorder: 80,
+    capacity: 300,
+    expiry: "2026-11",
+    status: "green",
+    batch: "B-5520",
+  },
+  {
+    id: "S-005",
+    name: "Metformin 500mg",
+    sku: "MET-500",
+    category: "Diabetes",
+    onHand: 880,
+    reorder: 300,
+    capacity: 1500,
+    expiry: "2027-01",
+    status: "green",
+    batch: "B-6610",
+  },
+  {
+    id: "S-006",
+    name: "Ceftriaxone 1g Vial",
+    sku: "CEF-1G",
+    category: "Antibiotics",
+    onHand: 60,
+    reorder: 100,
+    capacity: 400,
+    expiry: "2026-02",
+    status: "yellow",
+    issue: "12 units damaged on receipt",
+    batch: "B-4408",
+    damagedUnits: 12,
+  },
+  {
+    id: "S-007",
+    name: "Loratadine 10mg",
+    sku: "LOR-10",
+    category: "Antihistamines",
+    onHand: 12,
+    reorder: 150,
+    capacity: 600,
+    expiry: "2025-12",
+    status: "red",
+    issue: "Near expiry & critically low",
+    batch: "B-2210",
+  },
+  {
+    id: "S-008",
+    name: "ORS Sachets",
+    sku: "ORS-S",
+    category: "Rehydration",
+    onHand: 540,
+    reorder: 200,
+    capacity: 1000,
+    expiry: "2027-08",
+    status: "green",
+    batch: "B-8810",
+  },
 ];
+
+const INVENTORY_PRODUCTS_KEY = `cospharm.inventory.products.${INVENTORY_SEED_VERSION}`;
+const INVENTORY_MOVEMENTS_KEY = `cospharm.inventory.movements.${INVENTORY_SEED_VERSION}`;
+const INVENTORY_AUDIT_KEY = `cospharm.inventory.audit.${INVENTORY_SEED_VERSION}`;
+
+function loadLocalInventory<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const INITIAL_DELIVERIES: Delivery[] = [
   {
-    id: "D-1042", customerName: "Princess Marina Hospital", assignedMarketer: "Bisa", assignedOps: "TT",
-    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(5),
-    requiredStockIds: ["S-001", "S-002"], requiredTaskIds: ["T-1043"],
+    id: "D-1042",
+    customerName: "Princess Marina Hospital",
+    assignedMarketer: "Bisa",
+    assignedOps: "TT",
+    dueDate: todayIso,
+    status: "IN_PROGRESS",
+    steps: makeSteps(5),
+    requiredStockIds: ["S-001", "S-002"],
+    requiredTaskIds: ["T-1043"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1043", customerName: "Sidilega Private Hospital", assignedMarketer: "Bisa", assignedOps: "Phuso",
-    dueDate: todayIso, status: "AT_RISK", steps: makeSteps(3),
-    requiredStockIds: ["S-002", "S-006"], requiredTaskIds: ["T-1046"],
+    id: "D-1043",
+    customerName: "Sidilega Private Hospital",
+    assignedMarketer: "Bisa",
+    assignedOps: "Phuso",
+    dueDate: todayIso,
+    status: "AT_RISK",
+    steps: makeSteps(3),
+    requiredStockIds: ["S-002", "S-006"],
+    requiredTaskIds: ["T-1046"],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1044", customerName: "Lenmed Bokamoso Private Hospital", assignedMarketer: "Bakang", assignedOps: "Tshepang",
-    dueDate: todayIso, status: "BLOCKED", steps: makeSteps(2),
-    requiredStockIds: ["S-003"], requiredTaskIds: ["T-1047"],
+    id: "D-1044",
+    customerName: "Lenmed Bokamoso Private Hospital",
+    assignedMarketer: "Bakang",
+    assignedOps: "Tshepang",
+    dueDate: todayIso,
+    status: "BLOCKED",
+    steps: makeSteps(2),
+    requiredStockIds: ["S-003"],
+    requiredTaskIds: ["T-1047"],
     delayReason: "Insulin Glargine critically low",
     dispatchWindow: "AFTERNOON",
     priority: "emergency",
     emergencyFlaggedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
   },
   {
-    id: "D-1045", customerName: "Mediland Healthcare Distributors", assignedMarketer: "Lebo", assignedOps: "TT",
-    dueDate: yesterdayIso, status: "IN_PROGRESS", steps: makeSteps(4),
-    requiredStockIds: ["S-007"], requiredTaskIds: [],
+    id: "D-1045",
+    customerName: "Mediland Healthcare Distributors",
+    assignedMarketer: "Lebo",
+    assignedOps: "TT",
+    dueDate: yesterdayIso,
+    status: "IN_PROGRESS",
+    steps: makeSteps(4),
+    requiredStockIds: ["S-007"],
+    requiredTaskIds: [],
     dispatchWindow: "MORNING",
     wasLate: true,
-    delayReason: "POD pending from previous delivery slowed route. Driver returned after 10:30 cutoff.",
+    delayReason:
+      "POD pending from previous delivery slowed route. Driver returned after 10:30 cutoff.",
     responsibleDept: "Dispatch",
     customerNotified: true,
     notificationMethod: "CALL",
   },
   {
-    id: "D-1046", customerName: "Acacia Medicare Clinic", assignedMarketer: "Bisa", assignedOps: "Phuso",
-    dueDate: todayIso, status: "DELIVERED", steps: makeSteps(7),
-    requiredStockIds: ["S-001", "S-005"], requiredTaskIds: [],
+    id: "D-1046",
+    customerName: "Acacia Medicare Clinic",
+    assignedMarketer: "Bisa",
+    assignedOps: "Phuso",
+    dueDate: todayIso,
+    status: "DELIVERED",
+    steps: makeSteps(7),
+    requiredStockIds: ["S-001", "S-005"],
+    requiredTaskIds: [],
     dispatchWindow: "AFTERNOON",
   },
   {
-    id: "D-1047", customerName: "Gaborone Private Hospital", assignedMarketer: "Bakang", assignedOps: "TT",
-    dueDate: todayIso, status: "DISPATCHED", steps: makeSteps(7),
-    requiredStockIds: ["S-004"], requiredTaskIds: [],
+    id: "D-1047",
+    customerName: "Gaborone Private Hospital",
+    assignedMarketer: "Bakang",
+    assignedOps: "TT",
+    dueDate: todayIso,
+    status: "DISPATCHED",
+    steps: makeSteps(7),
+    requiredStockIds: ["S-004"],
+    requiredTaskIds: [],
     dispatchWindow: "MORNING",
   },
   {
-    id: "D-1048", customerName: "Medswana", assignedMarketer: "Lebo", assignedOps: "Tshepang",
-    dueDate: todayIso, status: "IN_PROGRESS", steps: makeSteps(3),
-    requiredStockIds: ["S-005"], requiredTaskIds: [],
+    id: "D-1048",
+    customerName: "Medswana",
+    assignedMarketer: "Lebo",
+    assignedOps: "Tshepang",
+    dueDate: todayIso,
+    status: "IN_PROGRESS",
+    steps: makeSteps(3),
+    requiredStockIds: ["S-005"],
+    requiredTaskIds: [],
     dispatchWindow: "AFTERNOON",
   },
 ];
@@ -177,77 +421,364 @@ const STAFF = STAFF_ROSTER.map((s) => ({
 
 const seedAudit = (): AuditEntry[] => [
   {
-    id: "A-001", entityType: "task", entityId: "T-1045", entityLabel: "Controlled drugs cabinet count",
-    field: "status", oldValue: "yellow", newValue: "green",
-    user: "Grace Okoye", role: "staff", comment: "Counts match register; witnessed by supervisor.",
+    id: "A-001",
+    entityType: "task",
+    entityId: "T-1045",
+    entityLabel: "Controlled drugs cabinet count",
+    field: "status",
+    oldValue: "yellow",
+    newValue: "green",
+    user: "Grace Okoye",
+    role: "staff",
+    comment: "Counts match register; witnessed by supervisor.",
     timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
   },
   {
-    id: "A-002", entityType: "stock", entityId: "S-006", entityLabel: "Ceftriaxone 1g Vial",
-    field: "issue", oldValue: "—", newValue: "12 units damaged on receipt",
-    user: "John Mensah", role: "staff", comment: "Damage report filed against shipment INV-9921.",
+    id: "A-002",
+    entityType: "stock",
+    entityId: "S-006",
+    entityLabel: "Ceftriaxone 1g Vial",
+    field: "issue",
+    oldValue: "—",
+    newValue: "12 units damaged on receipt",
+    user: "John Mensah",
+    role: "staff",
+    comment: "Damage report filed against shipment INV-9921.",
     timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
   },
 ];
 
 const SEED_PROMO_STOCK: PromoStockItem[] = [
-  { id: "PS-001", name: "Branded Sample Packs", sku: "PRM-SP-01", category: "Samples", onHand: 200, allocated: 40, expiry: "2026-12",
-    requestedBy: "Bisa", reasonForRequest: "Princess Marina open day this Friday — need 50 samples to hand out.",
-    requestStatus: "APPROVED", decidedBy: "Aobakwe",
-    notes: [
-    { id: "PN-1", authorName: "Lesego", authorRole: "marketing_supervisor", message: "Reserve 50 for the OSC on Friday.", createdAt: new Date(Date.now() - 86400000).toISOString() },
-  ]},
-  { id: "PS-002", name: "Promo Pens", sku: "PRM-PN-01", category: "Giveaways", onHand: 500, allocated: 120,
-    requestedBy: "Sofia", reasonForRequest: "Telesales follow-up bundle for 60 pharmacies.", requestStatus: "PENDING",
-    notes: [] },
-  { id: "PS-003", name: "Paracetamol Sample Strips", sku: "PRM-PCM", category: "Samples", onHand: 80, allocated: 10, expiry: "2026-08",
-    requestedBy: "Bakang", reasonForRequest: "Sample drop to 3 new clinics in Mogoditshane.", requestStatus: "DECLINED",
+  {
+    id: "PS-001",
+    name: "Branded Sample Packs",
+    sku: "PRM-SP-01",
+    category: "Samples",
+    onHand: 200,
+    allocated: 40,
+    expiry: "2026-12",
+    requestedBy: "Bisa",
+    reasonForRequest: "Princess Marina open day this Friday — need 50 samples to hand out.",
+    requestStatus: "APPROVED",
     decidedBy: "Aobakwe",
-    notes: [] },
-  { id: "PS-004", name: "Branded Tote Bags", sku: "PRM-TT-02", category: "Giveaways", onHand: 300, allocated: 60, notes: [] },
-  { id: "PS-005", name: "Vitamin C Sample Sachets", sku: "PRM-VC-03", category: "Samples", onHand: 600, allocated: 150, expiry: "2027-03",
-    requestedBy: "Lebo", reasonForRequest: "Gaborone Mall activation 80 samples.", requestStatus: "APPROVED", decidedBy: "Lesego",
     notes: [
-    { id: "PN-2", authorName: "Lebo", authorRole: "marketer", message: "Holding 80 for the Gaborone activation.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
-  ]},
-  { id: "PS-006", name: "A5 Product Brochures", sku: "PRM-BR-04", category: "Print collateral", onHand: 1200, allocated: 300,
-    requestedBy: "Sofia", reasonForRequest: "Mailout pack for telesales pipeline.", requestStatus: "PENDING",
-    notes: [] },
-  { id: "PS-007", name: "Branded Lanyards", sku: "PRM-LN-05", category: "Giveaways", onHand: 250, allocated: 50, notes: [] },
-  { id: "PS-008", name: "Hand Sanitiser 60ml", sku: "PRM-HS-06", category: "Samples", onHand: 420, allocated: 90, expiry: "2026-10", notes: [] },
-  { id: "PS-009", name: "Pull-up Banners", sku: "PRM-BN-07", category: "Activation kit", onHand: 18, allocated: 4, notes: [
-    { id: "PN-3", authorName: "Aobakwe", authorRole: "marketing_lead", message: "Two banners are at the warehouse, ready for collection.", createdAt: new Date(Date.now() - 3600000).toISOString() },
-  ]},
-  { id: "PS-010", name: "Cospharm Branded Notebooks", sku: "PRM-NB-08", category: "Giveaways", onHand: 350, allocated: 70, notes: [] },
-  { id: "PS-011", name: "Multivitamin Sample Packs", sku: "PRM-MV-09", category: "Samples", onHand: 240, allocated: 60, expiry: "2027-01", notes: [] },
-  { id: "PS-012", name: "Cough Syrup Mini Bottles", sku: "PRM-CS-10", category: "Samples", onHand: 96, allocated: 16, expiry: "2026-09", notes: [] },
+      {
+        id: "PN-1",
+        authorName: "Lesego",
+        authorRole: "marketing_supervisor",
+        message: "Reserve 50 for the OSC on Friday.",
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+      },
+    ],
+  },
+  {
+    id: "PS-002",
+    name: "Promo Pens",
+    sku: "PRM-PN-01",
+    category: "Giveaways",
+    onHand: 500,
+    allocated: 120,
+    requestedBy: "Sofia",
+    reasonForRequest: "Telesales follow-up bundle for 60 pharmacies.",
+    requestStatus: "PENDING",
+    notes: [],
+  },
+  {
+    id: "PS-003",
+    name: "Paracetamol Sample Strips",
+    sku: "PRM-PCM",
+    category: "Samples",
+    onHand: 80,
+    allocated: 10,
+    expiry: "2026-08",
+    requestedBy: "Bakang",
+    reasonForRequest: "Sample drop to 3 new clinics in Mogoditshane.",
+    requestStatus: "DECLINED",
+    decidedBy: "Aobakwe",
+    notes: [],
+  },
+  {
+    id: "PS-004",
+    name: "Branded Tote Bags",
+    sku: "PRM-TT-02",
+    category: "Giveaways",
+    onHand: 300,
+    allocated: 60,
+    notes: [],
+  },
+  {
+    id: "PS-005",
+    name: "Vitamin C Sample Sachets",
+    sku: "PRM-VC-03",
+    category: "Samples",
+    onHand: 600,
+    allocated: 150,
+    expiry: "2027-03",
+    requestedBy: "Lebo",
+    reasonForRequest: "Gaborone Mall activation 80 samples.",
+    requestStatus: "APPROVED",
+    decidedBy: "Lesego",
+    notes: [
+      {
+        id: "PN-2",
+        authorName: "Lebo",
+        authorRole: "marketer",
+        message: "Holding 80 for the Gaborone activation.",
+        createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      },
+    ],
+  },
+  {
+    id: "PS-006",
+    name: "A5 Product Brochures",
+    sku: "PRM-BR-04",
+    category: "Print collateral",
+    onHand: 1200,
+    allocated: 300,
+    requestedBy: "Sofia",
+    reasonForRequest: "Mailout pack for telesales pipeline.",
+    requestStatus: "PENDING",
+    notes: [],
+  },
+  {
+    id: "PS-007",
+    name: "Branded Lanyards",
+    sku: "PRM-LN-05",
+    category: "Giveaways",
+    onHand: 250,
+    allocated: 50,
+    notes: [],
+  },
+  {
+    id: "PS-008",
+    name: "Hand Sanitiser 60ml",
+    sku: "PRM-HS-06",
+    category: "Samples",
+    onHand: 420,
+    allocated: 90,
+    expiry: "2026-10",
+    notes: [],
+  },
+  {
+    id: "PS-009",
+    name: "Pull-up Banners",
+    sku: "PRM-BN-07",
+    category: "Activation kit",
+    onHand: 18,
+    allocated: 4,
+    notes: [
+      {
+        id: "PN-3",
+        authorName: "Aobakwe",
+        authorRole: "marketing_lead",
+        message: "Two banners are at the warehouse, ready for collection.",
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+    ],
+  },
+  {
+    id: "PS-010",
+    name: "Cospharm Branded Notebooks",
+    sku: "PRM-NB-08",
+    category: "Giveaways",
+    onHand: 350,
+    allocated: 70,
+    notes: [],
+  },
+  {
+    id: "PS-011",
+    name: "Multivitamin Sample Packs",
+    sku: "PRM-MV-09",
+    category: "Samples",
+    onHand: 240,
+    allocated: 60,
+    expiry: "2027-01",
+    notes: [],
+  },
+  {
+    id: "PS-012",
+    name: "Cough Syrup Mini Bottles",
+    sku: "PRM-CS-10",
+    category: "Samples",
+    onHand: 96,
+    allocated: 16,
+    expiry: "2026-09",
+    notes: [],
+  },
 ];
 
 const SEED_VISITS: FieldVisit[] = [
-  { id: "FV-1", title: "Princess Marina quarterly review", date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", marketer: "Bisa", customer: "Princess Marina Hospital", location: "Gaborone", notes: "Bring Q3 sales report", status: "PLANNED" },
-  { id: "FV-2", title: "OSC — Acacia Medicare Clinic", date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), time: "14:00", type: "OSC", marketer: "Bisa", customer: "Acacia Medicare Clinic", status: "PLANNED" },
+  {
+    id: "FV-1",
+    title: "Princess Marina quarterly review",
+    date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    time: "10:00",
+    type: "MEETING",
+    marketer: "Bisa",
+    customer: "Princess Marina Hospital",
+    location: "Gaborone",
+    notes: "Bring Q3 sales report",
+    status: "PLANNED",
+  },
+  {
+    id: "FV-2",
+    title: "OSC — Acacia Medicare Clinic",
+    date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
+    time: "14:00",
+    type: "OSC",
+    marketer: "Bisa",
+    customer: "Acacia Medicare Clinic",
+    status: "PLANNED",
+  },
 ];
 
 const SEED_FIELD_LOG: FieldLogEntry[] = [
-  { id: "FL-1", date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Sidilega Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }], notes: "Procurement lead interested in expanded antibiotics range; will revert next week.", createdAt: new Date(Date.now() - 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP"] },
-  { id: "FL-2", date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Lenmed Bokamoso Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Closed order for cardiovascular range; PO to follow.", createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), activities: ["SITE_VISIT", "PROMO_TALK"] },
-  { id: "FL-3", date: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Medplus Medical Centre", visitType: "ACTIVATION", outcome: "SAMPLE_GIVEN", productsUsed: [{ promoStockId: "PS-005", productName: "Vitamin C Sample Sachets", quantity: 40 }], notes: "Activation table outside reception; 40 sachets handed out.", createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), activities: ["SITE_VISIT", "SAMPLE_DROP", "PROMO_TALK"] },
-  { id: "FL-4", date: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10), marketer: "Sofia", customer: "Mediland Healthcare Distributors", visitType: "CUSTOMER_VISIT", outcome: "FOLLOW_UP", productsUsed: [], notes: "Telesales call with procurement.", createdAt: new Date(Date.now() - 4 * 86400000).toISOString(), activities: ["TELESALES_CALL"] },
-  { id: "FL-5", date: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10), marketer: "Bisa", customer: "Acacia Medicare Clinic", visitType: "CUSTOMER_VISIT", outcome: "INFO_ONLY", productsUsed: [], notes: "Stock check — re-orders due in 2 weeks.", createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), activities: ["STOCK_CHECK"] },
-  { id: "FL-6", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), marketer: "Bakang", customer: "Life Gaborone Private Hospital", visitType: "MEETING", outcome: "FOLLOW_UP", productsUsed: [], notes: "Training session on new respiratory range delivered to ward sisters.", createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), activities: ["TRAINING", "PROMO_TALK"] },
-  { id: "FL-7", date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10), marketer: "Lebo", customer: "Gaborone Private Hospital", visitType: "CUSTOMER_VISIT", outcome: "SALE", productsUsed: [], notes: "Order placed for paediatric line; awaiting credit clearance.", createdAt: new Date(Date.now() - 9 * 86400000).toISOString(), activities: ["SITE_VISIT"] },
+  {
+    id: "FL-1",
+    date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+    marketer: "Bisa",
+    customer: "Sidilega Private Hospital",
+    visitType: "CUSTOMER_VISIT",
+    outcome: "FOLLOW_UP",
+    productsUsed: [{ promoStockId: "PS-001", productName: "Branded Sample Packs", quantity: 5 }],
+    notes: "Procurement lead interested in expanded antibiotics range; will revert next week.",
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    activities: ["SITE_VISIT", "SAMPLE_DROP"],
+  },
+  {
+    id: "FL-2",
+    date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10),
+    marketer: "Bakang",
+    customer: "Lenmed Bokamoso Private Hospital",
+    visitType: "CUSTOMER_VISIT",
+    outcome: "SALE",
+    productsUsed: [],
+    notes: "Closed order for cardiovascular range; PO to follow.",
+    createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+    activities: ["SITE_VISIT", "PROMO_TALK"],
+  },
+  {
+    id: "FL-3",
+    date: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10),
+    marketer: "Lebo",
+    customer: "Medplus Medical Centre",
+    visitType: "ACTIVATION",
+    outcome: "SAMPLE_GIVEN",
+    productsUsed: [
+      { promoStockId: "PS-005", productName: "Vitamin C Sample Sachets", quantity: 40 },
+    ],
+    notes: "Activation table outside reception; 40 sachets handed out.",
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    activities: ["SITE_VISIT", "SAMPLE_DROP", "PROMO_TALK"],
+  },
+  {
+    id: "FL-4",
+    date: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10),
+    marketer: "Sofia",
+    customer: "Mediland Healthcare Distributors",
+    visitType: "CUSTOMER_VISIT",
+    outcome: "FOLLOW_UP",
+    productsUsed: [],
+    notes: "Telesales call with procurement.",
+    createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    activities: ["TELESALES_CALL"],
+  },
+  {
+    id: "FL-5",
+    date: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10),
+    marketer: "Bisa",
+    customer: "Acacia Medicare Clinic",
+    visitType: "CUSTOMER_VISIT",
+    outcome: "INFO_ONLY",
+    productsUsed: [],
+    notes: "Stock check — re-orders due in 2 weeks.",
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+    activities: ["STOCK_CHECK"],
+  },
+  {
+    id: "FL-6",
+    date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
+    marketer: "Bakang",
+    customer: "Life Gaborone Private Hospital",
+    visitType: "MEETING",
+    outcome: "FOLLOW_UP",
+    productsUsed: [],
+    notes: "Training session on new respiratory range delivered to ward sisters.",
+    createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+    activities: ["TRAINING", "PROMO_TALK"],
+  },
+  {
+    id: "FL-7",
+    date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10),
+    marketer: "Lebo",
+    customer: "Gaborone Private Hospital",
+    visitType: "CUSTOMER_VISIT",
+    outcome: "SALE",
+    productsUsed: [],
+    notes: "Order placed for paediatric line; awaiting credit clearance.",
+    createdAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+    activities: ["SITE_VISIT"],
+  },
 ];
 
 const SEED_AUTH_REQUESTS: AuthorisationRequest[] = [
-  { id: "AR-001", type: "PROMO_RELEASE", requestedBy: "Bisa", requestedByRole: "marketer", customer: "Princess Marina Hospital", details: "Release 30 sample packs for clinic open day", amount: 30, createdAt: new Date(Date.now() - 3600000).toISOString(), status: "PENDING" },
+  {
+    id: "AR-001",
+    type: "PROMO_RELEASE",
+    requestedBy: "Bisa",
+    requestedByRole: "marketer",
+    customer: "Princess Marina Hospital",
+    details: "Release 30 sample packs for clinic open day",
+    amount: 30,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    status: "PENDING",
+  },
 ];
 
 const SEED_CALENDAR: CalendarEvent[] = [
-  { id: "CE-1", title: "Monthly stocktake", date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: "07:00", type: "STOCKTAKE", owner: "Legkotla P.", description: "Full warehouse count", important: true },
-  { id: "CE-2", title: "BoMRA inspection", date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), type: "AUDIT", owner: "Tariro", important: true },
-  { id: "CE-3", title: "Activation — Gaborone Mall", date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), time: "09:00", type: "ACTIVATION", owner: "Bisa", location: "Gaborone Mall" },
-  { id: "CE-4", title: "Marketers monthly meeting", date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), time: "10:00", type: "MEETING", owner: "Aobakwe" },
-  { id: "CE-5", title: "Quarterly report deadline", date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), type: "DEADLINE", owner: "Mr. T", important: true },
+  {
+    id: "CE-1",
+    title: "Monthly stocktake",
+    date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+    time: "07:00",
+    type: "STOCKTAKE",
+    owner: "Legkotla P.",
+    description: "Full warehouse count",
+    important: true,
+  },
+  {
+    id: "CE-2",
+    title: "BoMRA inspection",
+    date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    type: "AUDIT",
+    owner: "Tariro",
+    important: true,
+  },
+  {
+    id: "CE-3",
+    title: "Activation — Gaborone Mall",
+    date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+    time: "09:00",
+    type: "ACTIVATION",
+    owner: "Bisa",
+    location: "Gaborone Mall",
+  },
+  {
+    id: "CE-4",
+    title: "Marketers monthly meeting",
+    date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
+    time: "10:00",
+    type: "MEETING",
+    owner: "Aobakwe",
+  },
+  {
+    id: "CE-5",
+    title: "Quarterly report deadline",
+    date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+    type: "DEADLINE",
+    owner: "Mr. T",
+    important: true,
+  },
 ];
 
 const TARGET_DELIVERIES_PER_DAY = 8;
@@ -259,7 +790,9 @@ const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
     orderedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
     customerName: "Medplus Medical Centre",
     clientContact: CLIENT_CONTACTS["Medplus Medical Centre"],
-    items: [{ productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" }],
+    items: [
+      { productName: "Amoxicillin 250mg", quantity: 50, urgencyNote: "Customer ran out mid-week" },
+    ],
     reason: "Customer ran out mid-week; next scheduled dispatch is tomorrow.",
     status: "PENDING_APPROVAL",
   },
@@ -283,61 +816,263 @@ const INITIAL_EMERGENCY_ORDERS: EmergencyOrder[] = [
 ];
 
 // ===== Regulatory & HR seed data =====
-function daysFromNow(d: number) { return new Date(Date.now() + d * 86400000).toISOString().slice(0, 10); }
+function daysFromNow(d: number) {
+  return new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+}
 
 const SEED_LICENSES: License[] = [
-  { id: "LIC-1", type: "Wholesale Dealer's License", holder: "Cospharm (Pty) Ltd", issueDate: "2024-03-01", expiryDate: daysFromNow(120) },
-  { id: "LIC-2", type: "Qualified Person License", holder: "Tariro M. (QP)", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
-  { id: "LIC-3", type: "Import Permit", holder: "Shipment INV-7732", issueDate: daysFromNow(-15), expiryDate: daysFromNow(15) },
-  { id: "LIC-4", type: "Import Permit", holder: "Shipment INV-7741", issueDate: daysFromNow(-10), expiryDate: daysFromNow(80) },
-  { id: "LIC-5", type: "Export Permit", holder: "Shipment EXP-2210", issueDate: daysFromNow(-5), expiryDate: daysFromNow(-2) },
-  { id: "LIC-6", type: "Export Permit", holder: "Shipment EXP-2244", issueDate: daysFromNow(-1), expiryDate: daysFromNow(28) },
+  {
+    id: "LIC-1",
+    type: "Wholesale Dealer's License",
+    holder: "Cospharm (Pty) Ltd",
+    issueDate: "2024-03-01",
+    expiryDate: daysFromNow(120),
+  },
+  {
+    id: "LIC-2",
+    type: "Qualified Person License",
+    holder: "Tariro M. (QP)",
+    issueDate: "2023-08-15",
+    expiryDate: daysFromNow(45),
+  },
+  {
+    id: "LIC-3",
+    type: "Import Permit",
+    holder: "Shipment INV-7732",
+    issueDate: daysFromNow(-15),
+    expiryDate: daysFromNow(15),
+  },
+  {
+    id: "LIC-4",
+    type: "Import Permit",
+    holder: "Shipment INV-7741",
+    issueDate: daysFromNow(-10),
+    expiryDate: daysFromNow(80),
+  },
+  {
+    id: "LIC-5",
+    type: "Export Permit",
+    holder: "Shipment EXP-2210",
+    issueDate: daysFromNow(-5),
+    expiryDate: daysFromNow(-2),
+  },
+  {
+    id: "LIC-6",
+    type: "Export Permit",
+    holder: "Shipment EXP-2244",
+    issueDate: daysFromNow(-1),
+    expiryDate: daysFromNow(28),
+  },
 ];
 
 const SEED_ZONES: ColdChainZone[] = [
-  { id: "Z-1", name: "Cooler A — Vaccines", currentTempC: 4.1, targetRange: [2, 8], lastBreachAt: undefined, resolved: true },
-  { id: "Z-2", name: "Cooler B — Insulin", currentTempC: 6.5, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 9 * 86400000).toISOString(), breachDurationMins: 22, resolved: true },
-  { id: "Z-3", name: "Cooler C — Biologics", currentTempC: 9.2, targetRange: [2, 8], lastBreachAt: new Date(Date.now() - 2 * 3600000).toISOString(), breachDurationMins: 75, resolved: false },
-  { id: "Z-4", name: "Ambient Bay — Controlled", currentTempC: 22.0, targetRange: [15, 25], resolved: true },
+  {
+    id: "Z-1",
+    name: "Cooler A — Vaccines",
+    currentTempC: 4.1,
+    targetRange: [2, 8],
+    lastBreachAt: undefined,
+    resolved: true,
+  },
+  {
+    id: "Z-2",
+    name: "Cooler B — Insulin",
+    currentTempC: 6.5,
+    targetRange: [2, 8],
+    lastBreachAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+    breachDurationMins: 22,
+    resolved: true,
+  },
+  {
+    id: "Z-3",
+    name: "Cooler C — Biologics",
+    currentTempC: 9.2,
+    targetRange: [2, 8],
+    lastBreachAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+    breachDurationMins: 75,
+    resolved: false,
+  },
+  {
+    id: "Z-4",
+    name: "Ambient Bay — Controlled",
+    currentTempC: 22.0,
+    targetRange: [15, 25],
+    resolved: true,
+  },
 ];
 
 const SEED_BATCHES: BatchRecord[] = [
-  { id: "B-1", batchNumber: "B-7741", product: "Paracetamol 500mg", expiry: daysFromNow(800), quantity: 1240, linkedDeliveryIds: ["D-1042", "D-1046"] },
-  { id: "B-2", batchNumber: "B-3320", product: "Amoxicillin 250mg", expiry: daysFromNow(120), quantity: 320, linkedDeliveryIds: ["D-1043"] },
-  { id: "B-3", batchNumber: "B-9011", product: "Insulin Glargine 100IU", expiry: daysFromNow(60), quantity: 28, linkedDeliveryIds: ["D-1044"] },
-  { id: "B-4", batchNumber: "B-2210", product: "Loratadine 10mg", expiry: daysFromNow(15), quantity: 12, linkedDeliveryIds: [] },
-  { id: "B-5", batchNumber: "B-8810", product: "ORS Sachets", expiry: daysFromNow(600), quantity: 540, linkedDeliveryIds: ["D-1048"] },
+  {
+    id: "B-1",
+    batchNumber: "B-7741",
+    product: "Paracetamol 500mg",
+    expiry: daysFromNow(800),
+    quantity: 1240,
+    linkedDeliveryIds: ["D-1042", "D-1046"],
+  },
+  {
+    id: "B-2",
+    batchNumber: "B-3320",
+    product: "Amoxicillin 250mg",
+    expiry: daysFromNow(120),
+    quantity: 320,
+    linkedDeliveryIds: ["D-1043"],
+  },
+  {
+    id: "B-3",
+    batchNumber: "B-9011",
+    product: "Insulin Glargine 100IU",
+    expiry: daysFromNow(60),
+    quantity: 28,
+    linkedDeliveryIds: ["D-1044"],
+  },
+  {
+    id: "B-4",
+    batchNumber: "B-2210",
+    product: "Loratadine 10mg",
+    expiry: daysFromNow(15),
+    quantity: 12,
+    linkedDeliveryIds: [],
+  },
+  {
+    id: "B-5",
+    batchNumber: "B-8810",
+    product: "ORS Sachets",
+    expiry: daysFromNow(600),
+    quantity: 540,
+    linkedDeliveryIds: ["D-1048"],
+  },
 ];
 
 const SEED_CONTROLLED: ControlledDrugLog[] = [
-  { id: "CD-1", product: "Pethidine 50mg", batch: "B-PD-091", handler: "Tariro", action: "RECEIVED", timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
-  { id: "CD-2", product: "Morphine 10mg/ml", batch: "B-MP-244", handler: "Aman", action: "DISPENSED", timestamp: new Date(Date.now() - 3 * 3600000).toISOString() },
-  { id: "CD-3", product: "Diazepam 5mg", batch: "B-DZ-115", handler: "Alaska", action: "TRANSFERRED", timestamp: new Date(Date.now() - 1 * 3600000).toISOString() },
+  {
+    id: "CD-1",
+    product: "Pethidine 50mg",
+    batch: "B-PD-091",
+    handler: "Tariro",
+    action: "RECEIVED",
+    timestamp: new Date(Date.now() - 6 * 3600000).toISOString(),
+  },
+  {
+    id: "CD-2",
+    product: "Morphine 10mg/ml",
+    batch: "B-MP-244",
+    handler: "Aman",
+    action: "DISPENSED",
+    timestamp: new Date(Date.now() - 3 * 3600000).toISOString(),
+  },
+  {
+    id: "CD-3",
+    product: "Diazepam 5mg",
+    batch: "B-DZ-115",
+    handler: "Alaska",
+    action: "TRANSFERRED",
+    timestamp: new Date(Date.now() - 1 * 3600000).toISOString(),
+  },
 ];
 
 const SEED_INSPECTION: Inspection = {
   lastDate: daysFromNow(-90),
   nextDate: daysFromNow(10),
   actions: [
-    { id: "CA-1", description: "Replace temperature logger in Cooler C", due: daysFromNow(-3), status: "OPEN" },
-    { id: "CA-2", description: "Update SOP for controlled drug transfers", due: daysFromNow(5), status: "OPEN" },
-    { id: "CA-3", description: "Renew QP delegation letter", due: daysFromNow(-20), status: "CLOSED" },
+    {
+      id: "CA-1",
+      description: "Replace temperature logger in Cooler C",
+      due: daysFromNow(-3),
+      status: "OPEN",
+    },
+    {
+      id: "CA-2",
+      description: "Update SOP for controlled drug transfers",
+      due: daysFromNow(5),
+      status: "OPEN",
+    },
+    {
+      id: "CA-3",
+      description: "Renew QP delegation letter",
+      due: daysFromNow(-20),
+      status: "CLOSED",
+    },
   ],
 };
 
 const SEED_CERTS: StaffCertification[] = [
-  { id: "CR-1", staffName: "TT", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2023-01-10", expiryDate: daysFromNow(140) },
-  { id: "CR-2", staffName: "Phuso", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", issueDate: "2024-05-01", expiryDate: daysFromNow(45) },
-  { id: "CR-3", staffName: "Tshepang", staffRole: "Dispatch", type: "DRIVERS_LICENSE_PDP", missing: true },
-  { id: "CR-4", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "COLD_CHAIN_HANDLING", issueDate: "2023-09-12", expiryDate: daysFromNow(200) },
-  { id: "CR-5", staffName: "Aman", staffRole: "Regulatory", type: "CONTROLLED_SUBSTANCES", issueDate: "2024-02-22", expiryDate: daysFromNow(20) },
-  { id: "CR-6", staffName: "Tariro", staffRole: "Regulatory", type: "QUALIFIED_PERSON", issueDate: "2023-08-15", expiryDate: daysFromNow(45) },
-  { id: "CR-7", staffName: "Legkotla P.", staffRole: "Warehouse Supervisor", type: "FORKLIFT", issueDate: "2023-04-01", expiryDate: daysFromNow(330) },
+  {
+    id: "CR-1",
+    staffName: "TT",
+    staffRole: "Dispatch",
+    type: "DRIVERS_LICENSE_PDP",
+    issueDate: "2023-01-10",
+    expiryDate: daysFromNow(140),
+  },
+  {
+    id: "CR-2",
+    staffName: "Phuso",
+    staffRole: "Dispatch",
+    type: "DRIVERS_LICENSE_PDP",
+    issueDate: "2024-05-01",
+    expiryDate: daysFromNow(45),
+  },
+  {
+    id: "CR-3",
+    staffName: "Tshepang",
+    staffRole: "Dispatch",
+    type: "DRIVERS_LICENSE_PDP",
+    missing: true,
+  },
+  {
+    id: "CR-4",
+    staffName: "Legkotla P.",
+    staffRole: "Warehouse Supervisor",
+    type: "COLD_CHAIN_HANDLING",
+    issueDate: "2023-09-12",
+    expiryDate: daysFromNow(200),
+  },
+  {
+    id: "CR-5",
+    staffName: "Aman",
+    staffRole: "Regulatory",
+    type: "CONTROLLED_SUBSTANCES",
+    issueDate: "2024-02-22",
+    expiryDate: daysFromNow(20),
+  },
+  {
+    id: "CR-6",
+    staffName: "Tariro",
+    staffRole: "Regulatory",
+    type: "QUALIFIED_PERSON",
+    issueDate: "2023-08-15",
+    expiryDate: daysFromNow(45),
+  },
+  {
+    id: "CR-7",
+    staffName: "Legkotla P.",
+    staffRole: "Warehouse Supervisor",
+    type: "FORKLIFT",
+    issueDate: "2023-04-01",
+    expiryDate: daysFromNow(330),
+  },
 ];
 
 const SEED_LEAVE: LeaveRecord[] = [
-  { id: "LV-1", staffName: "Tshepang", staffRole: "Driver", critical: true, from: daysFromNow(-1), to: daysFromNow(2), reason: "Sick leave" },
-  { id: "LV-2", staffName: "Sofia", staffRole: "Telesales", critical: false, from: daysFromNow(-2), to: daysFromNow(0), reason: "Annual leave" },
+  {
+    id: "LV-1",
+    staffName: "Tshepang",
+    staffRole: "Driver",
+    critical: true,
+    from: daysFromNow(-1),
+    to: daysFromNow(2),
+    reason: "Sick leave",
+  },
+  {
+    id: "LV-2",
+    staffName: "Sofia",
+    staffRole: "Telesales",
+    critical: false,
+    from: daysFromNow(-2),
+    to: daysFromNow(0),
+    reason: "Annual leave",
+  },
 ];
 
 // ===== Component =====
@@ -349,8 +1084,10 @@ export function CospharmDashboard() {
   const currentUser = ROLE_USERS[role];
 
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [stock, setStock] = useState<StockItem[]>(INITIAL_STOCK);
+  const [stock, setStock] = useState<InventoryProduct[]>(PREPARED_PRODUCTS);
+  const [movements, setMovements] = useState<InventoryMovement[]>(PREPARED_MOVEMENTS);
   const [audit, setAudit] = useState<AuditEntry[]>(seedAudit);
+  const [inventoryHydrated, setInventoryHydrated] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>(INITIAL_DELIVERIES);
   const [comments, setComments] = useState<Comment[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(SEED_CALENDAR);
@@ -360,13 +1097,63 @@ export function CospharmDashboard() {
   const [authRequests, setAuthRequests] = useState<AuthorisationRequest[]>(SEED_AUTH_REQUESTS);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [emergencyOrders, setEmergencyOrders] = useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
+  const [emergencyOrders, setEmergencyOrders] =
+    useState<EmergencyOrder[]>(INITIAL_EMERGENCY_ORDERS);
   const [delayDialog, setDelayDialog] = useState<Delivery | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<"active" | "emergency">("active");
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [stockDialog, setStockDialog] = useState<StockItem | null>(null);
   const [openDeliveryId, setOpenDeliveryId] = useState<string | null>(null);
+  const autoLateLogged = useRef(new Set<string>());
+
+  useEffect(() => {
+    let active = true;
+    async function hydrateInventory() {
+      setAudit(loadLocalInventory(INVENTORY_AUDIT_KEY, seedAudit()));
+      if (inventoryDatabaseConfigured()) {
+        try {
+          let database = await loadInventoryDatabase();
+          if (!database.products.length && !database.movements.length) {
+            await seedPreparedInventoryDatabase();
+            database = await loadInventoryDatabase();
+          }
+          if (active && database.products.length) {
+            setStock(database.products);
+            setMovements(database.movements);
+            setInventoryHydrated(true);
+            return;
+          }
+        } catch (error) {
+          console.error("Inventory database hydration failed; using the browser cache.", error);
+        }
+      }
+      if (active) {
+        setStock(loadLocalInventory(INVENTORY_PRODUCTS_KEY, PREPARED_PRODUCTS));
+        setMovements(loadLocalInventory(INVENTORY_MOVEMENTS_KEY, PREPARED_MOVEMENTS));
+        setInventoryHydrated(true);
+      }
+    }
+    void hydrateInventory();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!inventoryHydrated) return;
+    window.localStorage.setItem(INVENTORY_PRODUCTS_KEY, JSON.stringify(stock));
+  }, [inventoryHydrated, stock]);
+
+  useEffect(() => {
+    if (!inventoryHydrated) return;
+    window.localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(movements));
+  }, [inventoryHydrated, movements]);
+
+  useEffect(() => {
+    if (!inventoryHydrated) return;
+    window.localStorage.setItem(INVENTORY_AUDIT_KEY, JSON.stringify(audit));
+  }, [audit, inventoryHydrated]);
 
   // ===== Late delivery auto-detection (on mount + every 60s) =====
   useEffect(() => {
@@ -384,6 +1171,15 @@ export function CospharmDashboard() {
         if (shouldMarkLate(d, now)) {
           changed = true;
           const cutoff = DISPATCH_WINDOW_LABELS[d.dispatchWindow ?? "AFTERNOON"].sub;
+          if (autoLateLogged.current.has(d.id)) {
+            return {
+              ...d,
+              status: "LATE" as const,
+              wasLate: true,
+              lateDetectedAt: now.toISOString(),
+            };
+          }
+          autoLateLogged.current.add(d.id);
           queueMicrotask(() => {
             setAlerts((al) => {
               if (al.find((a) => a.sourceId === d.id && a.title.includes("Late"))) return al;
@@ -423,7 +1219,12 @@ export function CospharmDashboard() {
               role: "admin",
             });
           });
-          return { ...d, status: "LATE" as const, wasLate: true, lateDetectedAt: now.toISOString() };
+          return {
+            ...d,
+            status: "LATE" as const,
+            wasLate: true,
+            lateDetectedAt: now.toISOString(),
+          };
         }
         return d;
       });
@@ -432,10 +1233,16 @@ export function CospharmDashboard() {
   }
 
   function pushActivity(e: Omit<ActivityEvent, "id" | "timestamp">) {
-    setActivity((prev) => [
-      { ...e, id: `EV-${prev.length + 1}`, timestamp: new Date().toISOString() },
-      ...prev,
-    ].slice(0, 50));
+    setActivity((prev) =>
+      [
+        {
+          ...e,
+          id: `EV-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ].slice(0, 50),
+    );
   }
 
   function logAudit(entry: Omit<AuditEntry, "id" | "timestamp" | "user" | "role">) {
@@ -460,47 +1267,239 @@ export function CospharmDashboard() {
           return { ...t, status: "yellow", note: comment, pendingVerification: true };
         }
         if (next === "green" && isSupervisor) {
-          return { ...t, status: "green", note: comment, pendingVerification: false, verifiedBy: currentUser.name, verifiedAt: new Date().toISOString() };
+          return {
+            ...t,
+            status: "green",
+            note: comment,
+            pendingVerification: false,
+            verifiedBy: currentUser.name,
+            verifiedAt: new Date().toISOString(),
+          };
         }
         return { ...t, status: next, note: comment };
       }),
     );
-    logAudit({ entityType: "task", entityId: task.id, entityLabel: task.title, field: "status", oldValue: task.status, newValue: next === "green" && !isSupervisor ? "yellow (pending verification)" : next, comment });
-    pushActivity({ kind: next === "green" && !isSupervisor ? "verification" : "task", message: `${task.title} → ${next}${next === "green" && !isSupervisor ? " (awaiting supervisor verification)" : ""}`, actor: currentUser.name, role: currentUser.role });
+    logAudit({
+      entityType: "task",
+      entityId: task.id,
+      entityLabel: task.title,
+      field: "status",
+      oldValue: task.status,
+      newValue: next === "green" && !isSupervisor ? "yellow (pending verification)" : next,
+      comment,
+    });
+    pushActivity({
+      kind: next === "green" && !isSupervisor ? "verification" : "task",
+      message: `${task.title} → ${next}${next === "green" && !isSupervisor ? " (awaiting supervisor verification)" : ""}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function verifyTask(task: Task) {
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id
-          ? { ...t, status: "green", pendingVerification: false, verifiedBy: currentUser.name, verifiedAt: new Date().toISOString() }
+          ? {
+              ...t,
+              status: "green",
+              pendingVerification: false,
+              verifiedBy: currentUser.name,
+              verifiedAt: new Date().toISOString(),
+            }
           : t,
       ),
     );
-    logAudit({ entityType: "task", entityId: task.id, entityLabel: task.title, field: "status", oldValue: "yellow (pending verification)", newValue: "green (verified)", comment: `Verified by ${currentUser.name}` });
-    pushActivity({ kind: "verification", message: `Verified ${task.title}`, actor: currentUser.name, role: currentUser.role });
+    logAudit({
+      entityType: "task",
+      entityId: task.id,
+      entityLabel: task.title,
+      field: "status",
+      oldValue: "yellow (pending verification)",
+      newValue: "green (verified)",
+      comment: `Verified by ${currentUser.name}`,
+    });
+    pushActivity({
+      kind: "verification",
+      message: `Verified ${task.title}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
-  function updateStock(item: StockItem, next: { onHand: number; issue?: string; status: Status }, comment: string) {
-    setStock((prev) =>
-      prev.map((s) => (s.id === item.id ? { ...s, onHand: next.onHand, issue: next.issue, status: next.status } : s)),
-    );
+  function updateStock(
+    item: StockItem,
+    next: { onHand: number; issue?: string; status: Status },
+    comment: string,
+  ) {
+    const updatedProduct = {
+      ...(item as InventoryProduct),
+      onHand: next.onHand,
+      issue: next.issue,
+      status: next.status,
+      lastCounted: new Date().toISOString().slice(0, 10),
+    };
+    setStock((prev) => prev.map((s) => (s.id === item.id ? updatedProduct : s)));
+    if (inventoryDatabaseConfigured()) {
+      void saveInventoryProduct(updatedProduct).catch((error) =>
+        console.error("Inventory database update failed.", error),
+      );
+    }
     if (next.onHand !== item.onHand) {
-      logAudit({ entityType: "stock", entityId: item.id, entityLabel: item.name, field: "onHand", oldValue: String(item.onHand), newValue: String(next.onHand), comment });
+      logAudit({
+        entityType: "stock",
+        entityId: item.id,
+        entityLabel: item.name,
+        field: "onHand",
+        oldValue: String(item.onHand),
+        newValue: String(next.onHand),
+        comment,
+      });
+      setMovements((prev) => [
+        {
+          id: `MV-ADJ-${Date.now()}`,
+          productId: item.id,
+          sku: item.sku,
+          month: new Date().toISOString().slice(0, 7),
+          date: new Date().toISOString().slice(0, 10),
+          type: "ADJUSTMENT",
+          quantity: next.onHand - item.onHand,
+          balance: next.onHand,
+          reference: "Manual stock update",
+          note: comment,
+        },
+        ...prev,
+      ]);
     }
     if ((next.issue ?? "") !== (item.issue ?? "")) {
-      logAudit({ entityType: "stock", entityId: item.id, entityLabel: item.name, field: "issue", oldValue: item.issue ?? "—", newValue: next.issue ?? "—", comment });
+      logAudit({
+        entityType: "stock",
+        entityId: item.id,
+        entityLabel: item.name,
+        field: "issue",
+        oldValue: item.issue ?? "—",
+        newValue: next.issue ?? "—",
+        comment,
+      });
     }
-    pushActivity({ kind: "stock", message: `Stock ${item.name} updated`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "stock",
+      message: `Stock ${item.name} updated`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
+  }
+
+  function syncInventory(
+    rows: ImportRow[],
+    importedMovements: InventoryMovement[],
+    fileName: string,
+  ) {
+    const applicable = rows.filter((row) => row.status === "new" || row.status === "changed");
+    const newRows = applicable.filter((row) => row.status === "new");
+    const changedRows = applicable.filter((row) => row.status === "changed");
+    const syncedProducts = [...stock];
+    for (const row of applicable) {
+      const index = syncedProducts.findIndex(
+        (product) => product.sku.toLowerCase() === row.product.sku.toLowerCase(),
+      );
+      if (index >= 0)
+        syncedProducts[index] = {
+          ...syncedProducts[index],
+          ...row.product,
+          id: syncedProducts[index].id,
+        };
+      else {
+        const id = `S-${String(syncedProducts.length + 1).padStart(3, "0")}`;
+        syncedProducts.push({ ...row.product, id });
+      }
+    }
+    setStock(syncedProducts);
+    if (importedMovements.length) {
+      setMovements((current) => {
+        const existingIds = new Set(current.map((movement) => movement.id));
+        const linked = importedMovements
+          .filter((movement) => movement.sku)
+          .map((movement) => ({
+            ...movement,
+            productId:
+              syncedProducts.find(
+                (product) => product.sku.toLowerCase() === movement.sku.toLowerCase(),
+              )?.id ?? "",
+          }))
+          .filter((movement) => movement.productId && !existingIds.has(movement.id));
+        return [...linked, ...current];
+      });
+    }
+    const timestamp = new Date().toISOString();
+    const entries: AuditEntry[] = applicable.map((row, index) => ({
+      id: `A-IMP-${Date.now()}-${index}`,
+      entityType: "stock",
+      entityId:
+        row.existing?.id ??
+        syncedProducts.find(
+          (product) => product.sku.toLowerCase() === row.product.sku.toLowerCase(),
+        )?.id ??
+        row.product.id,
+      entityLabel: row.product.name,
+      field: row.status === "new" ? "product" : "import",
+      oldValue: row.status === "new" ? "—" : (row.existing?.onHand.toString() ?? "—"),
+      newValue: row.status === "new" ? "Product created" : row.product.onHand.toString(),
+      user: currentUser.name,
+      role: currentUser.role,
+      comment: `${fileName}: ${row.status === "new" ? "new SKU imported" : `updated ${row.changedFields.join(", ")}`}`,
+      timestamp,
+    }));
+    setAudit((current) => [...entries, ...current]);
+    if (inventoryDatabaseConfigured()) {
+      const appliedProducts = applicable
+        .map((row) =>
+          syncedProducts.find(
+            (product) => product.sku.toLowerCase() === row.product.sku.toLowerCase(),
+          ),
+        )
+        .filter((product): product is InventoryProduct => Boolean(product));
+      void saveInventorySync(appliedProducts, importedMovements, entries, fileName, {
+        rowsRead: rows.length,
+        rowsNew: newRows.length,
+        rowsChanged: changedRows.length,
+        rowsUnchanged: rows.filter((row) => row.status === "unchanged").length,
+        rowsConflicted: rows.filter((row) => row.status === "conflict").length,
+      }).catch((error) => console.error("Inventory database sync failed.", error));
+    }
+    pushActivity({
+      kind: "stock",
+      message: `Inventory synced from ${fileName}: ${newRows.length} new, ${changedRows.length} changed`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function updateDelivery(next: Delivery, message: string) {
     setDeliveries((prev) => prev.map((d) => (d.id === next.id ? next : d)));
-    logAudit({ entityType: "task", entityId: next.id, entityLabel: `Delivery ${next.customerName}`, field: "status", oldValue: String(getCompletedSteps(prev_steps_for(next, deliveries))), newValue: String(getCompletedSteps(next.steps)) + "/7", comment: message });
-    pushActivity({ kind: "delivery", message: `Delivery ${next.id}: ${message}`, actor: currentUser.name, role: currentUser.role });
+    logAudit({
+      entityType: "task",
+      entityId: next.id,
+      entityLabel: `Delivery ${next.customerName}`,
+      field: "status",
+      oldValue: String(getCompletedSteps(prev_steps_for(next, deliveries))),
+      newValue: String(getCompletedSteps(next.steps)) + "/7",
+      comment: message,
+    });
+    pushActivity({
+      kind: "delivery",
+      message: `Delivery ${next.id}: ${message}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
-  function addComment(entityId: string, type: CommentType, message: string, entityType: Comment["relatedEntityType"] = "DELIVERY") {
+  function addComment(
+    entityId: string,
+    type: CommentType,
+    message: string,
+    entityType: Comment["relatedEntityType"] = "DELIVERY",
+  ) {
     const c: Comment = {
       id: `C-${comments.length + 1}`,
       relatedEntityType: entityType,
@@ -512,42 +1511,92 @@ export function CospharmDashboard() {
       createdAt: new Date().toISOString(),
     };
     setComments((prev) => [...prev, c]);
-    pushActivity({ kind: "comment", message: `${type.replace("_", " ")} on ${entityId}`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "comment",
+      message: `${type.replace("_", " ")} on ${entityId}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function hideComment(id: string) {
-    setComments((prev) => prev.map((c) => (c.id === id ? { ...c, hidden: true, hiddenBy: currentUser.name } : c)));
+    setComments((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, hidden: true, hiddenBy: currentUser.name } : c)),
+    );
   }
 
   function resolveLateDelivery(d: Delivery, reason: string) {
-    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? { ...x, status: "DELIVERED", resolutionNote: reason } : x)));
-    setAlerts((prev) => prev.map((a) => (a.sourceId === d.id ? { ...a, resolved: true, resolutionComment: reason } : a)));
-    logAudit({ entityType: "task", entityId: d.id, entityLabel: `Delivery ${d.customerName}`, field: "status", oldValue: "LATE", newValue: "DELIVERED", comment: `Resolved: ${reason}` });
-    pushActivity({ kind: "alert", message: `Late delivery ${d.id} resolved`, actor: currentUser.name, role: currentUser.role });
+    setDeliveries((prev) =>
+      prev.map((x) => (x.id === d.id ? { ...x, status: "DELIVERED", resolutionNote: reason } : x)),
+    );
+    setAlerts((prev) =>
+      prev.map((a) =>
+        a.sourceId === d.id ? { ...a, resolved: true, resolutionComment: reason } : a,
+      ),
+    );
+    logAudit({
+      entityType: "task",
+      entityId: d.id,
+      entityLabel: `Delivery ${d.customerName}`,
+      field: "status",
+      oldValue: "LATE",
+      newValue: "DELIVERED",
+      comment: `Resolved: ${reason}`,
+    });
+    pushActivity({
+      kind: "alert",
+      message: `Late delivery ${d.id} resolved`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
-  function saveDelayReason(d: Delivery, payload: {
-    delayReason: string;
-    responsibleDept: string;
-    customerNotified: "YES" | "NO" | "PENDING";
-    notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
-    resolutionPlan: string;
-  }) {
-    setDeliveries((prev) => prev.map((x) => (x.id === d.id ? {
-      ...x,
-      delayReason: payload.delayReason,
-      responsibleDept: payload.responsibleDept,
-      customerNotified: payload.customerNotified === "YES",
-      notificationMethod: payload.notificationMethod,
-      resolutionPlan: payload.resolutionPlan,
-      delayReasonAt: new Date().toISOString(),
-    } : x)));
-    logAudit({ entityType: "task", entityId: d.id, entityLabel: `Delivery ${d.customerName}`, field: "issue", oldValue: "—", newValue: "delay reason recorded", comment: `Delay reason for LATE ${d.id}: ${payload.delayReason} (responsible: ${payload.responsibleDept})` });
-    pushActivity({ kind: "delivery", message: `Delay reason recorded for ${d.id}`, actor: currentUser.name, role: currentUser.role });
+  function saveDelayReason(
+    d: Delivery,
+    payload: {
+      delayReason: string;
+      responsibleDept: string;
+      customerNotified: "YES" | "NO" | "PENDING";
+      notificationMethod?: "CALL" | "WHATSAPP" | "EMAIL";
+      resolutionPlan: string;
+    },
+  ) {
+    setDeliveries((prev) =>
+      prev.map((x) =>
+        x.id === d.id
+          ? {
+              ...x,
+              delayReason: payload.delayReason,
+              responsibleDept: payload.responsibleDept,
+              customerNotified: payload.customerNotified === "YES",
+              notificationMethod: payload.notificationMethod,
+              resolutionPlan: payload.resolutionPlan,
+              delayReasonAt: new Date().toISOString(),
+            }
+          : x,
+      ),
+    );
+    logAudit({
+      entityType: "task",
+      entityId: d.id,
+      entityLabel: `Delivery ${d.customerName}`,
+      field: "issue",
+      oldValue: "—",
+      newValue: "delay reason recorded",
+      comment: `Delay reason for LATE ${d.id}: ${payload.delayReason} (responsible: ${payload.responsibleDept})`,
+    });
+    pushActivity({
+      kind: "delivery",
+      message: `Delay reason recorded for ${d.id}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
     setDelayDialog(null);
   }
 
-  function createEmergencyOrder(o: Omit<EmergencyOrder, "id" | "orderedBy" | "orderedAt" | "status">) {
+  function createEmergencyOrder(
+    o: Omit<EmergencyOrder, "id" | "orderedBy" | "orderedAt" | "status">,
+  ) {
     const id = `EMG-${1000 + emergencyOrders.length + 1}`;
     const next: EmergencyOrder = {
       ...o,
@@ -557,74 +1606,178 @@ export function CospharmDashboard() {
       status: "PENDING_APPROVAL",
     };
     setEmergencyOrders((prev) => [next, ...prev]);
-    setAlerts((prev) => [{
-      id: `AL-EMG-${id}`,
-      severity: "yellow",
-      source: "delivery",
-      sourceId: id,
-      title: `Emergency order raised: ${id}`,
-      body: `${next.customerName} — awaiting supervisor approval.`,
-      createdAt: new Date().toISOString(),
-    }, ...prev]);
-    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${next.customerName}`, field: "status", oldValue: "—", newValue: "PENDING_APPROVAL", comment: next.reason });
-    pushActivity({ kind: "delivery", message: `Emergency order ${id} raised for ${next.customerName}`, actor: currentUser.name, role: currentUser.role });
+    setAlerts((prev) => [
+      {
+        id: `AL-EMG-${id}`,
+        severity: "yellow",
+        source: "delivery",
+        sourceId: id,
+        title: `Emergency order raised: ${id}`,
+        body: `${next.customerName} — awaiting supervisor approval.`,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    logAudit({
+      entityType: "task",
+      entityId: id,
+      entityLabel: `Emergency order ${next.customerName}`,
+      field: "status",
+      oldValue: "—",
+      newValue: "PENDING_APPROVAL",
+      comment: next.reason,
+    });
+    pushActivity({
+      kind: "delivery",
+      message: `Emergency order ${id} raised for ${next.customerName}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function updateEmergencyStatus(id: string, status: EmergencyOrderStatus, note?: string) {
-    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? {
-      ...o,
-      status,
-      authorisedBy: status === "APPROVED" || status === "CANCELLED" ? currentUser.name : o.authorisedBy,
-      authorisedAt: status === "APPROVED" || status === "CANCELLED" ? new Date().toISOString() : o.authorisedAt,
-      cancellationReason: status === "CANCELLED" ? note : o.cancellationReason,
-    } : o));
-    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "—", newValue: status, comment: note ?? `Status changed to ${status}` });
-    pushActivity({ kind: "delivery", message: `Emergency order ${id} → ${status}`, actor: currentUser.name, role: currentUser.role });
+    setEmergencyOrders((prev) =>
+      prev.map((o) =>
+        o.id === id
+          ? {
+              ...o,
+              status,
+              authorisedBy:
+                status === "APPROVED" || status === "CANCELLED" ? currentUser.name : o.authorisedBy,
+              authorisedAt:
+                status === "APPROVED" || status === "CANCELLED"
+                  ? new Date().toISOString()
+                  : o.authorisedAt,
+              cancellationReason: status === "CANCELLED" ? note : o.cancellationReason,
+            }
+          : o,
+      ),
+    );
+    logAudit({
+      entityType: "task",
+      entityId: id,
+      entityLabel: `Emergency order ${id}`,
+      field: "status",
+      oldValue: "—",
+      newValue: status,
+      comment: note ?? `Status changed to ${status}`,
+    });
+    pushActivity({
+      kind: "delivery",
+      message: `Emergency order ${id} → ${status}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function assignEmergencyDriver(id: string, driver: string, eta: string) {
-    setEmergencyOrders((prev) => prev.map((o) => o.id === id ? { ...o, driverAssigned: driver, estimatedDelivery: eta, status: "ASSIGNED_TO_DRIVER" } : o));
-    logAudit({ entityType: "task", entityId: id, entityLabel: `Emergency order ${id}`, field: "status", oldValue: "APPROVED", newValue: "ASSIGNED_TO_DRIVER", comment: `Driver ${driver}, ETA ${eta}` });
-    pushActivity({ kind: "delivery", message: `Emergency ${id} assigned to ${driver}`, actor: currentUser.name, role: currentUser.role });
+    setEmergencyOrders((prev) =>
+      prev.map((o) =>
+        o.id === id
+          ? { ...o, driverAssigned: driver, estimatedDelivery: eta, status: "ASSIGNED_TO_DRIVER" }
+          : o,
+      ),
+    );
+    logAudit({
+      entityType: "task",
+      entityId: id,
+      entityLabel: `Emergency order ${id}`,
+      field: "status",
+      oldValue: "APPROVED",
+      newValue: "ASSIGNED_TO_DRIVER",
+      comment: `Driver ${driver}, ETA ${eta}`,
+    });
+    pushActivity({
+      kind: "delivery",
+      message: `Emergency ${id} assigned to ${driver}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function addCalendarEvent(e: Omit<CalendarEvent, "id">) {
     const id = `CE-${calendarEvents.length + 100}`;
     setCalendarEvents((prev) => [{ ...e, id }, ...prev]);
-    pushActivity({ kind: "delivery", message: `Calendar event added: ${e.title}`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "delivery",
+      message: `Calendar event added: ${e.title}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function addPromoNote(promoId: string, message: string) {
-    setPromoStock((prev) => prev.map((p) => p.id === promoId ? {
-      ...p,
-      notes: [...p.notes, { id: `PN-${Date.now()}`, authorName: currentUser.name, authorRole: currentUser.role, message, createdAt: new Date().toISOString() }],
-    } : p));
-    pushActivity({ kind: "comment", message: `Promo note added`, actor: currentUser.name, role: currentUser.role });
+    setPromoStock((prev) =>
+      prev.map((p) =>
+        p.id === promoId
+          ? {
+              ...p,
+              notes: [
+                ...p.notes,
+                {
+                  id: `PN-${Date.now()}`,
+                  authorName: currentUser.name,
+                  authorRole: currentUser.role,
+                  message,
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            }
+          : p,
+      ),
+    );
+    pushActivity({
+      kind: "comment",
+      message: `Promo note added`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function addVisit(v: Omit<FieldVisit, "id">) {
     setVisits((prev) => [...prev, { ...v, id: `FV-${prev.length + 100}` }]);
-    pushActivity({ kind: "delivery", message: `Visit scheduled: ${v.title}`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "delivery",
+      message: `Visit scheduled: ${v.title}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function updateVisit(id: string, patch: Partial<FieldVisit>) {
-    setVisits((prev) => prev.map((v) => v.id === id ? { ...v, ...patch } : v));
+    setVisits((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
 
   function addFieldLog(e: Omit<FieldLogEntry, "id" | "createdAt">) {
-    const entry: FieldLogEntry = { ...e, id: `FL-${fieldLog.length + 100}`, createdAt: new Date().toISOString() };
+    const entry: FieldLogEntry = {
+      ...e,
+      id: `FL-${fieldLog.length + 100}`,
+      createdAt: new Date().toISOString(),
+    };
     setFieldLog((prev) => [entry, ...prev]);
     // Auto-deduct promo stock
     if (e.productsUsed.length) {
-      setPromoStock((prev) => prev.map((p) => {
-        const used = e.productsUsed.find((u) => u.promoStockId === p.id);
-        return used ? { ...p, onHand: Math.max(0, p.onHand - used.quantity) } : p;
-      }));
+      setPromoStock((prev) =>
+        prev.map((p) => {
+          const used = e.productsUsed.find((u) => u.promoStockId === p.id);
+          return used ? { ...p, onHand: Math.max(0, p.onHand - used.quantity) } : p;
+        }),
+      );
     }
-    pushActivity({ kind: "delivery", message: `Field log added for ${e.customer}`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "delivery",
+      message: `Field log added for ${e.customer}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
-  function createAuthRequest(r: Omit<AuthorisationRequest, "id" | "createdAt" | "status" | "requestedBy" | "requestedByRole">) {
+  function createAuthRequest(
+    r: Omit<
+      AuthorisationRequest,
+      "id" | "createdAt" | "status" | "requestedBy" | "requestedByRole"
+    >,
+  ) {
     const req: AuthorisationRequest = {
       ...r,
       id: `AR-${String(authRequests.length + 100).padStart(3, "0")}`,
@@ -634,14 +1787,34 @@ export function CospharmDashboard() {
       requestedByRole: currentUser.role,
     };
     setAuthRequests((prev) => [req, ...prev]);
-    pushActivity({ kind: "alert", message: `Authorisation request ${req.id} raised`, actor: currentUser.name, role: currentUser.role });
+    pushActivity({
+      kind: "alert",
+      message: `Authorisation request ${req.id} raised`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   function decideAuthRequest(id: string, decision: "APPROVED" | "REJECTED", note: string) {
-    setAuthRequests((prev) => prev.map((r) => r.id === id ? {
-      ...r, status: decision, decidedBy: currentUser.name, decidedAt: new Date().toISOString(), decisionNote: note,
-    } : r));
-    pushActivity({ kind: "alert", message: `Request ${id} ${decision.toLowerCase()}`, actor: currentUser.name, role: currentUser.role });
+    setAuthRequests((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              status: decision,
+              decidedBy: currentUser.name,
+              decidedAt: new Date().toISOString(),
+              decisionNote: note,
+            }
+          : r,
+      ),
+    );
+    pushActivity({
+      kind: "alert",
+      message: `Request ${id} ${decision.toLowerCase()}`,
+      actor: currentUser.name,
+      role: currentUser.role,
+    });
   }
 
   // ===== Derived =====
@@ -659,17 +1832,17 @@ export function CospharmDashboard() {
   const filteredTasks = visibleTasks.filter((t) =>
     [t.title, t.assignee, t.id].join(" ").toLowerCase().includes(search.toLowerCase()),
   );
-  const filteredStock = stock.filter((s) =>
-    [s.name, s.sku, s.category].join(" ").toLowerCase().includes(search.toLowerCase()),
-  );
-
   const deliveriesWithRisk = useMemo(
     () => deliveries.map((d) => ({ d, risk: deriveDeliveryRisk(d, tasks, stock) })),
     [deliveries, tasks, stock],
   );
 
-  const deliveredToday = deliveries.filter((d) => d.status === "DELIVERED" && d.dueDate === todayIso).length;
-  const pendingDeliveries = deliveries.filter((d) => ["PENDING", "IN_PROGRESS"].includes(d.status)).length;
+  const deliveredToday = deliveries.filter(
+    (d) => d.status === "DELIVERED" && d.dueDate === todayIso,
+  ).length;
+  const pendingDeliveries = deliveries.filter((d) =>
+    ["PENDING", "IN_PROGRESS"].includes(d.status),
+  ).length;
   const atRiskDeliveries = deliveries.filter((d) => d.status === "AT_RISK").length;
   const lateDeliveries = deliveries.filter((d) => d.status === "LATE").length;
   const blockedDeliveries = deliveries.filter((d) => d.status === "BLOCKED").length;
@@ -681,37 +1854,105 @@ export function CospharmDashboard() {
 
   // Critical actions: red+yellow tasks + critical stock + late/blocked deliveries
   const criticalActions = useMemo(() => {
-    const items: { id: string; severity: 0 | 1 | 2; kind: "task" | "stock" | "delivery"; title: string; subtitle: string; due?: string; assignee?: string }[] = [];
+    const items: {
+      id: string;
+      severity: 0 | 1 | 2;
+      kind: "task" | "stock" | "delivery";
+      title: string;
+      subtitle: string;
+      due?: string;
+      assignee?: string;
+    }[] = [];
     for (const t of visibleTasks) {
-      if (t.status === "red") items.push({ id: t.id, severity: 2, kind: "task", title: t.title, subtitle: t.note ?? "", due: t.due, assignee: t.assignee });
-      else if (t.status === "yellow") items.push({ id: t.id, severity: 1, kind: "task", title: t.title, subtitle: t.note ?? "", due: t.due, assignee: t.assignee });
+      if (t.status === "red")
+        items.push({
+          id: t.id,
+          severity: 2,
+          kind: "task",
+          title: t.title,
+          subtitle: t.note ?? "",
+          due: t.due,
+          assignee: t.assignee,
+        });
+      else if (t.status === "yellow")
+        items.push({
+          id: t.id,
+          severity: 1,
+          kind: "task",
+          title: t.title,
+          subtitle: t.note ?? "",
+          due: t.due,
+          assignee: t.assignee,
+        });
     }
     for (const s of stock) {
-      if (s.status === "red") items.push({ id: s.id, severity: 2, kind: "stock", title: s.name, subtitle: s.issue ?? "Critical" });
-      else if (s.status === "yellow") items.push({ id: s.id, severity: 1, kind: "stock", title: s.name, subtitle: s.issue ?? "Low" });
+      if (s.status === "red")
+        items.push({
+          id: s.id,
+          severity: 2,
+          kind: "stock",
+          title: s.name,
+          subtitle: s.issue ?? "Critical",
+        });
+      else if (s.status === "yellow")
+        items.push({
+          id: s.id,
+          severity: 1,
+          kind: "stock",
+          title: s.name,
+          subtitle: s.issue ?? "Low",
+        });
     }
     for (const d of deliveries) {
-      if (d.status === "LATE" || d.status === "BLOCKED") items.push({ id: d.id, severity: 2, kind: "delivery", title: `${d.id} · ${d.customerName}`, subtitle: d.delayReason ?? d.status, due: d.dueDate, assignee: d.assignedOps });
-      else if (d.status === "AT_RISK") items.push({ id: d.id, severity: 1, kind: "delivery", title: `${d.id} · ${d.customerName}`, subtitle: "At risk", due: d.dueDate, assignee: d.assignedOps });
+      if (d.status === "LATE" || d.status === "BLOCKED")
+        items.push({
+          id: d.id,
+          severity: 2,
+          kind: "delivery",
+          title: `${d.id} · ${d.customerName}`,
+          subtitle: d.delayReason ?? d.status,
+          due: d.dueDate,
+          assignee: d.assignedOps,
+        });
+      else if (d.status === "AT_RISK")
+        items.push({
+          id: d.id,
+          severity: 1,
+          kind: "delivery",
+          title: `${d.id} · ${d.customerName}`,
+          subtitle: "At risk",
+          due: d.dueDate,
+          assignee: d.assignedOps,
+        });
     }
-    return items.sort((a, b) => b.severity - a.severity || (a.due ?? "").localeCompare(b.due ?? "")).slice(0, 8);
+    return items
+      .sort((a, b) => b.severity - a.severity || (a.due ?? "").localeCompare(b.due ?? ""))
+      .slice(0, 8);
   }, [visibleTasks, stock, deliveries]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header role={role} setRole={setRole} user={currentUser} />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Operations dashboard</h1>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Operations dashboard
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{currentUser.name}</span> · {ROLE_LABEL[role]} — {ROLE_DESCRIPTION[role]}
+              Signed in as <span className="font-medium text-foreground">{currentUser.name}</span> ·{" "}
+              {ROLE_LABEL[role]} — {ROLE_DESCRIPTION[role]}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks or stock…" className="w-64 pl-9" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search tasks or stock…"
+                className="w-64 pl-9"
+              />
             </div>
             {can(role, "task.create") ? (
               <Button variant="default" className="gap-1.5">
@@ -723,21 +1964,47 @@ export function CospharmDashboard() {
 
         <Tabs value={tab} onValueChange={setTab} className="space-y-6">
           <TabsList className="flex w-full flex-wrap sm:inline-flex">
-            <TabsTrigger value="overview" className="gap-1.5"><LayoutDashboard className="size-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Tasks</TabsTrigger>
-            <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Stock</TabsTrigger>
-            <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
+            <TabsTrigger value="overview" className="gap-1.5">
+              <LayoutDashboard className="size-4" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="deliveries" className="gap-1.5">
+              <Truck className="size-4" /> Deliveries
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-1.5">
+              <ClipboardList className="size-4" /> Tasks
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="gap-1.5">
+              <Boxes className="size-4" /> Stock
+            </TabsTrigger>
+            <TabsTrigger
+              value="marketer"
+              className="gap-1.5"
+              disabled={
+                !can(role, "marketer.view") &&
+                role !== "marketer" &&
+                role !== "telesales" &&
+                role !== "marketing_lead" &&
+                role !== "marketing_supervisor"
+              }
+            >
               <Megaphone className="size-4" /> Marketer
             </TabsTrigger>
-            <TabsTrigger value="regulatory" className="gap-1.5" disabled={!can(role, "regulatory.view")}>
+            <TabsTrigger
+              value="regulatory"
+              className="gap-1.5"
+              disabled={!can(role, "regulatory.view")}
+            >
               <Shield className="size-4" /> Regulatory
             </TabsTrigger>
             <TabsTrigger value="hr" className="gap-1.5" disabled={!can(role, "hr.view")}>
               <HeartHandshake className="size-4" /> HR
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="size-4" /> Calendar</TabsTrigger>
-            <TabsTrigger value="audit" className="gap-1.5"><History className="size-4" /> Audit</TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5">
+              <CalendarDays className="size-4" /> Calendar
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5">
+              <History className="size-4" /> Audit
+            </TabsTrigger>
             <TabsTrigger value="admin" className="gap-1.5" disabled={!can(role, "users.manage")}>
               <UserCog className="size-4" /> Admin
             </TabsTrigger>
@@ -748,24 +2015,62 @@ export function CospharmDashboard() {
             <EmergencyOrdersBanner
               deliveries={deliveries}
               emergencyOrders={emergencyOrders}
-              onOpen={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+              onOpen={() => {
+                setTab("deliveries");
+                setDeliveriesTab("emergency");
+              }}
             />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiCard icon={<Truck className="size-5" />} label="Delivered today" value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`} sub="Target progress" tone="green" />
-              <KpiCard icon={<Clock className="size-5" />} label="Pending" value={pendingDeliveries} sub="Awaiting completion" tone="yellow" />
-              <KpiCard icon={<AlertTriangle className="size-5" />} label="At risk / Blocked" value={atRiskDeliveries + blockedDeliveries} sub="Need supervisor action" tone="yellow" />
-              <KpiCard icon={<ShieldCheck className="size-5" />} label="Late deliveries" value={lateDeliveries} sub="Past dispatch cutoff" tone="red" />
+              <KpiCard
+                icon={<Truck className="size-5" />}
+                label="Delivered today"
+                value={`${deliveredToday} / ${TARGET_DELIVERIES_PER_DAY}`}
+                sub="Target progress"
+                tone="green"
+              />
+              <KpiCard
+                icon={<Clock className="size-5" />}
+                label="Pending"
+                value={pendingDeliveries}
+                sub="Awaiting completion"
+                tone="yellow"
+              />
+              <KpiCard
+                icon={<AlertTriangle className="size-5" />}
+                label="At risk / Blocked"
+                value={atRiskDeliveries + blockedDeliveries}
+                sub="Need supervisor action"
+                tone="yellow"
+              />
+              <KpiCard
+                icon={<ShieldCheck className="size-5" />}
+                label="Late deliveries"
+                value={lateDeliveries}
+                sub="Past dispatch cutoff"
+                tone="red"
+              />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
               <DeliveryRiskPanel items={deliveriesWithRisk} onOpen={setOpenDeliveryId} />
-              <CriticalActionsQueue items={criticalActions} onOpenTask={setOpenTaskId} onOpenDelivery={setOpenDeliveryId} onOpenStock={(id) => { const s = stock.find((x) => x.id === id); if (s) setStockDialog(s); }} />
+              <CriticalActionsQueue
+                items={criticalActions}
+                onOpenTask={setOpenTaskId}
+                onOpenDelivery={setOpenDeliveryId}
+                onOpenStock={(id) => {
+                  const s = stock.find((x) => x.id === id);
+                  if (s) setStockDialog(s);
+                }}
+              />
             </div>
 
             <DispatchWindowsPanel
               deliveries={deliveries}
               emergencyOrders={emergencyOrders}
-              onOpenEmergency={() => { setTab("deliveries"); setDeliveriesTab("emergency"); }}
+              onOpenEmergency={() => {
+                setTab("deliveries");
+                setDeliveriesTab("emergency");
+              }}
             />
 
             <div className="grid gap-6 lg:grid-cols-3">
@@ -782,15 +2087,24 @@ export function CospharmDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {tasks.filter((t) => t.pendingVerification).map((t) => (
-                    <div key={t.id} className="flex items-center justify-between rounded-md border p-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{t.title}</p>
-                        <p className="text-xs text-muted-foreground">Completed by {t.assignee} · {t.note}</p>
+                  {tasks
+                    .filter((t) => t.pendingVerification)
+                    .map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between rounded-md border p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{t.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Completed by {t.assignee} · {t.note}
+                          </p>
+                        </div>
+                        <Button size="sm" onClick={() => verifyTask(t)}>
+                          Verify
+                        </Button>
                       </div>
-                      <Button size="sm" onClick={() => verifyTask(t)}>Verify</Button>
-                    </div>
-                  ))}
+                    ))}
                 </CardContent>
               </Card>
             ) : null}
@@ -798,7 +2112,10 @@ export function CospharmDashboard() {
 
           {/* ============ DELIVERIES ============ */}
           <TabsContent value="deliveries" className="space-y-4">
-            <Tabs value={deliveriesTab} onValueChange={(v) => setDeliveriesTab(v as "active" | "emergency")}>
+            <Tabs
+              value={deliveriesTab}
+              onValueChange={(v) => setDeliveriesTab(v as "active" | "emergency")}
+            >
               <TabsList>
                 <TabsTrigger value="active">All deliveries</TabsTrigger>
                 <TabsTrigger value="emergency" className="gap-1.5">
@@ -811,59 +2128,78 @@ export function CospharmDashboard() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="active" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Active deliveries · 7-step workflow</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Each delivery follows a strict chain of command. Users can only complete the steps allowed for their role; later steps require earlier ones.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {deliveriesWithRisk.map(({ d, risk }) => {
-                  const badge = deliveryStatusBadge(d.status);
-                  const w = d.dispatchWindow ?? "AFTERNOON";
-                  const winInfo = DISPATCH_WINDOW_LABELS[w];
-                  const isLate = d.status === "LATE";
-                  const needsDelayReason = isLate && !d.delayReason;
-                  return (
-                    <div
-                      key={d.id}
-                      className={`rounded-md border bg-card p-4 transition ${needsDelayReason ? "border-status-red animate-pulse" : isLate ? "border-status-red" : ""}`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <button onClick={() => setOpenDeliveryId(d.id)} className="text-left">
-                          <p className="font-mono text-xs text-muted-foreground">{d.id} · due {d.dueDate}</p>
-                          <p className="font-medium">{d.customerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Marketer {d.assignedMarketer} · Ops {d.assignedOps}
-                          </p>
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${winInfo.badge}`}>
-                            {winInfo.emoji} {winInfo.label}
-                          </span>
-                          {risk.risk !== "READY" ? <StatusBadge status={risk.risk === "BLOCKED" ? "red" : "yellow"} label={risk.risk === "BLOCKED" ? "Blocked" : "At risk"} /> : null}
-                          <StatusBadge status={badge.tone} label={badge.label} />
-                          {needsDelayReason ? (
-                            <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setDelayDialog(d); }}>
-                              Add delay reason
-                            </Button>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base font-semibold">
+                      Active deliveries · 7-step workflow
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Each delivery follows a strict chain of command. Users can only complete the
+                      steps allowed for their role; later steps require earlier ones.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {deliveriesWithRisk.map(({ d, risk }) => {
+                      const badge = deliveryStatusBadge(d.status);
+                      const w = d.dispatchWindow ?? "AFTERNOON";
+                      const winInfo = DISPATCH_WINDOW_LABELS[w];
+                      const isLate = d.status === "LATE";
+                      const needsDelayReason = isLate && !d.delayReason;
+                      return (
+                        <div
+                          key={d.id}
+                          className={`rounded-md border bg-card p-4 transition ${needsDelayReason ? "border-status-red animate-pulse" : isLate ? "border-status-red" : ""}`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <button onClick={() => setOpenDeliveryId(d.id)} className="text-left">
+                              <p className="font-mono text-xs text-muted-foreground">
+                                {d.id} · due {d.dueDate}
+                              </p>
+                              <p className="font-medium">{d.customerName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Marketer {d.assignedMarketer} · Ops {d.assignedOps}
+                              </p>
+                            </button>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${winInfo.badge}`}
+                              >
+                                {winInfo.emoji} {winInfo.label}
+                              </span>
+                              {risk.risk !== "READY" ? (
+                                <StatusBadge
+                                  status={risk.risk === "BLOCKED" ? "red" : "yellow"}
+                                  label={risk.risk === "BLOCKED" ? "Blocked" : "At risk"}
+                                />
+                              ) : null}
+                              <StatusBadge status={badge.tone} label={badge.label} />
+                              {needsDelayReason ? (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDelayDialog(d);
+                                  }}
+                                >
+                                  Add delay reason
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <DeliveryProgress steps={d.steps} />
+                          </div>
+                          {isLate && d.delayReason ? (
+                            <p className="mt-2 rounded bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
+                              Delay reason on record · {d.responsibleDept ?? ""} · {d.delayReason}
+                            </p>
                           ) : null}
                         </div>
-                      </div>
-                      <div className="mt-3">
-                        <DeliveryProgress steps={d.steps} />
-                      </div>
-                      {isLate && d.delayReason ? (
-                        <p className="mt-2 rounded bg-status-red/10 px-2 py-1 text-[11px] text-status-red">
-                          Delay reason on record · {d.responsibleDept ?? ""} · {d.delayReason}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
               </TabsContent>
               <TabsContent value="emergency" className="mt-4">
                 <EmergencyOrders
@@ -881,9 +2217,16 @@ export function CospharmDashboard() {
           <TabsContent value="tasks">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-semibold">{["staff","warehouse_staff","warehouse_checker","dispatch_staff"].includes(role) ? "My tasks" : "All tasks"}</CardTitle>
+                <CardTitle className="text-base font-semibold">
+                  {["staff", "warehouse_staff", "warehouse_checker", "dispatch_staff"].includes(
+                    role,
+                  )
+                    ? "My tasks"
+                    : "All tasks"}
+                </CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Staff mark tasks complete with a comment/evidence note; supervisors verify before tasks become final green.
+                  Staff mark tasks complete with a comment/evidence note; supervisors verify before
+                  tasks become final green.
                 </p>
               </CardHeader>
               <CardContent>
@@ -899,8 +2242,14 @@ export function CospharmDashboard() {
                   </TableHeader>
                   <TableBody>
                     {filteredTasks.map((t) => (
-                      <TableRow key={t.id} onClick={() => setOpenTaskId(t.id)} className="cursor-pointer">
-                        <TableCell className="font-mono text-xs text-muted-foreground">{t.id}</TableCell>
+                      <TableRow
+                        key={t.id}
+                        onClick={() => setOpenTaskId(t.id)}
+                        className="cursor-pointer"
+                      >
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {t.id}
+                        </TableCell>
                         <TableCell>
                           <div className="font-medium flex items-center gap-2">
                             {t.title}
@@ -910,11 +2259,15 @@ export function CospharmDashboard() {
                               </span>
                             ) : null}
                           </div>
-                          {t.note ? <div className="text-xs text-muted-foreground">{t.note}</div> : null}
+                          {t.note ? (
+                            <div className="text-xs text-muted-foreground">{t.note}</div>
+                          ) : null}
                         </TableCell>
                         <TableCell className="text-sm">{t.assignee}</TableCell>
                         <TableCell className="text-sm">{t.due}</TableCell>
-                        <TableCell className="text-right"><StatusBadge status={t.status} /></TableCell>
+                        <TableCell className="text-right">
+                          <StatusBadge status={t.status} />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -925,60 +2278,14 @@ export function CospharmDashboard() {
 
           {/* ============ STOCK ============ */}
           <TabsContent value="stock">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Stock condition</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Batch</TableHead>
-                      <TableHead>Available / Damaged</TableHead>
-                      <TableHead className="w-[160px]">Level</TableHead>
-                      <TableHead>Expiry</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStock.map((s) => {
-                      const pct = Math.min(100, Math.round((s.onHand / s.capacity) * 100));
-                      const canEdit = can(role, "stock.update");
-                      const canReport = can(role, "stock.report");
-                      return (
-                        <TableRow key={s.id}>
-                          <TableCell>
-                            <div className="font-medium">{s.name}</div>
-                            <div className="font-mono text-xs text-muted-foreground">{s.sku}</div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{s.batch ?? "—"}</TableCell>
-                          <TableCell className="text-sm">
-                            {s.onHand - (s.damagedUnits ?? 0)}
-                            {s.damagedUnits ? <span className="text-status-red"> · {s.damagedUnits} damaged</span> : null}
-                          </TableCell>
-                          <TableCell>
-                            <Progress value={pct} className="h-1.5" />
-                            {s.issue ? <div className="mt-1 text-xs text-muted-foreground">{s.issue}</div> : null}
-                          </TableCell>
-                          <TableCell className="text-sm">{s.expiry}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <StatusBadge status={s.status} />
-                              {canEdit || canReport ? (
-                                <Button size="sm" variant="ghost" onClick={() => setStockDialog(s)}>
-                                  {canEdit ? "Update" : "Report"}
-                                </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <InventoryModule
+              products={stock}
+              movements={movements}
+              audit={audit}
+              user={currentUser}
+              onAdjust={setStockDialog}
+              onSync={syncInventory}
+            />
           </TabsContent>
 
           {/* ============ MARKETER ============ */}
@@ -1019,7 +2326,9 @@ export function CospharmDashboard() {
                 <TabsTrigger value="trail">Audit trail</TabsTrigger>
                 <TabsTrigger value="digest">Notes digest</TabsTrigger>
               </TabsList>
-              <TabsContent value="trail"><AuditTrailCard entries={audit} /></TabsContent>
+              <TabsContent value="trail">
+                <AuditTrailCard entries={audit} />
+              </TabsContent>
               <TabsContent value="digest">
                 <NotesDigest audit={audit} comments={comments} fieldLog={fieldLog} />
               </TabsContent>
@@ -1070,15 +2379,20 @@ export function CospharmDashboard() {
                     </TableHeader>
                     <TableBody>
                       {STAFF.map((p) => {
-                        const health: Status = p.tasksPending === 0 ? "green" : p.tasksPending > 1 ? "red" : "yellow";
+                        const health: Status =
+                          p.tasksPending === 0 ? "green" : p.tasksPending > 1 ? "red" : "yellow";
                         return (
                           <TableRow key={p.name}>
                             <TableCell className="font-medium">{p.name}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.role}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {p.role}
+                            </TableCell>
                             <TableCell className="text-sm">{p.shift}</TableCell>
                             <TableCell className="text-sm">{p.tasksDone}</TableCell>
                             <TableCell className="text-sm">{p.tasksPending}</TableCell>
-                            <TableCell className="text-right"><StatusBadge status={health} /></TableCell>
+                            <TableCell className="text-right">
+                              <StatusBadge status={health} />
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -1091,7 +2405,10 @@ export function CospharmDashboard() {
         </Tabs>
 
         <footer className="mt-12 border-t pt-6 text-xs text-muted-foreground">
-          Prototype · Cospharm operations dashboard · data shown is illustrative.
+          Cospharm operations intelligence · inventory seed {INVENTORY_SEED_VERSION} ·
+          {inventoryDatabaseConfigured()
+            ? " database-backed workspace."
+            : " browser-persisted workspace."}
         </footer>
       </main>
 
@@ -1136,16 +2453,38 @@ function prev_steps_for(next: Delivery, list: Delivery[]) {
 }
 
 // ===== Header =====
-function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => void; user: CurrentUser }) {
-  const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2);
+function Header({
+  role,
+  setRole,
+  user,
+}: {
+  role: Role;
+  setRole: (r: Role) => void;
+  user: CurrentUser;
+}) {
+  const initials = user.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <img src={cospharmLogo.url} alt="Cospharm logo" className="size-11 object-contain" />
+          <div
+            aria-label="Cospharm logo"
+            className="relative grid size-11 place-items-center rounded-full bg-primary text-xl font-bold text-white shadow-sm"
+          >
+            C
+            <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-background bg-destructive" />
+          </div>
           <div>
-            <p className="text-base font-semibold leading-tight tracking-tight text-primary">Cospharm</p>
-            <p className="text-[11px] font-medium italic leading-tight text-status-red">Believe in Good</p>
+            <p className="text-base font-semibold leading-tight tracking-tight text-primary">
+              Cospharm
+            </p>
+            <p className="text-[11px] font-medium italic leading-tight text-status-red">
+              Believe in Good
+            </p>
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
@@ -1160,7 +2499,9 @@ function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => voi
             </SelectTrigger>
             <SelectContent className="max-h-[380px]">
               {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
+                <SelectItem key={r} value={r}>
+                  {ROLE_LABEL[r]}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1177,7 +2518,19 @@ function Header({ role, setRole, user }: { role: Role; setRole: (r: Role) => voi
   );
 }
 
-function KpiCard({ icon, label, value, sub, tone = "neutral" }: { icon: React.ReactNode; label: string; value: string | number; sub: string; tone?: "neutral" | "green" | "yellow" | "red" }) {
+function KpiCard({
+  icon,
+  label,
+  value,
+  sub,
+  tone = "neutral",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  sub: string;
+  tone?: "neutral" | "green" | "yellow" | "red";
+}) {
   const toneClasses: Record<typeof tone, string> = {
     neutral: "bg-secondary text-secondary-foreground",
     green: "bg-status-green/15 text-status-green",
@@ -1187,9 +2540,13 @@ function KpiCard({ icon, label, value, sub, tone = "neutral" }: { icon: React.Re
   return (
     <Card>
       <CardContent className="flex items-start gap-3 p-5">
-        <div className={`grid size-10 place-items-center rounded-md ${toneClasses[tone]}`}>{icon}</div>
+        <div className={`grid size-10 place-items-center rounded-md ${toneClasses[tone]}`}>
+          {icon}
+        </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
           <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
         </div>
@@ -1209,7 +2566,10 @@ function LegendDot({ status, label }: { status: Status; label: string }) {
 
 function countByStatus(items: Status[]) {
   return items.reduce(
-    (acc, s) => { acc[s] += 1; return acc; },
+    (acc, s) => {
+      acc[s] += 1;
+      return acc;
+    },
     { green: 0, yellow: 0, red: 0 } as Record<Status, number>,
   );
 }
@@ -1230,14 +2590,17 @@ function DeliveryRiskPanel({
           <Truck className="size-4" /> Delivery risk panel
         </CardTitle>
         <p className="mt-1 text-xs text-muted-foreground">
-          Ready · At risk (any required task or stock yellow) · Blocked (any required task or stock red).
+          Ready · At risk (any required task or stock yellow) · Blocked (any required task or stock
+          red).
         </p>
       </CardHeader>
       <CardContent className="space-y-2">
         {items.map(({ d, risk }) => {
           const badge = deliveryStatusBadge(d.status);
-          const tone: Status = risk.risk === "BLOCKED" ? "red" : risk.risk === "AT_RISK" ? "yellow" : "green";
-          const label = risk.risk === "BLOCKED" ? "Blocked" : risk.risk === "AT_RISK" ? "At risk" : "Ready";
+          const tone: Status =
+            risk.risk === "BLOCKED" ? "red" : risk.risk === "AT_RISK" ? "yellow" : "green";
+          const label =
+            risk.risk === "BLOCKED" ? "Blocked" : risk.risk === "AT_RISK" ? "At risk" : "Ready";
           return (
             <button
               key={d.id}
@@ -1247,7 +2610,9 @@ function DeliveryRiskPanel({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.customerName}</p>
-                  <p className="truncate text-xs text-muted-foreground">{d.id} · due {d.dueDate} · {d.assignedOps}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {d.id} · due {d.dueDate} · {d.assignedOps}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <StatusBadge status={tone} label={label} />
@@ -1272,7 +2637,15 @@ function CriticalActionsQueue({
   onOpenDelivery,
   onOpenStock,
 }: {
-  items: { id: string; severity: 0 | 1 | 2; kind: "task" | "stock" | "delivery"; title: string; subtitle: string; due?: string; assignee?: string }[];
+  items: {
+    id: string;
+    severity: 0 | 1 | 2;
+    kind: "task" | "stock" | "delivery";
+    title: string;
+    subtitle: string;
+    due?: string;
+    assignee?: string;
+  }[];
   onOpenTask: (id: string) => void;
   onOpenDelivery: (id: string) => void;
   onOpenStock: (id: string) => void;
@@ -1287,26 +2660,38 @@ function CriticalActionsQueue({
       </CardHeader>
       <CardContent className="space-y-2">
         {items.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">All clear.</p>
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+            All clear.
+          </p>
         ) : (
           items.map((it) => {
             const tone: Status = it.severity === 2 ? "red" : "yellow";
             return (
-              <div key={`${it.kind}-${it.id}`} className="flex items-start justify-between gap-2 rounded-md border p-3">
+              <div
+                key={`${it.kind}-${it.id}`}
+                className="flex items-start justify-between gap-2 rounded-md border p-3"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{it.title}</p>
                   <p className="text-[11px] text-muted-foreground truncate">
-                    {it.kind.toUpperCase()} · {it.assignee ?? "—"}{it.due ? ` · due ${it.due}` : ""}
+                    {it.kind.toUpperCase()} · {it.assignee ?? "—"}
+                    {it.due ? ` · due ${it.due}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{it.subtitle}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <StatusBadge status={tone} label={it.severity === 2 ? "Critical" : "Attention"} />
-                  <Button size="sm" variant="outline" onClick={() => {
-                    if (it.kind === "task") onOpenTask(it.id);
-                    else if (it.kind === "delivery") onOpenDelivery(it.id);
-                    else onOpenStock(it.id);
-                  }}>Open</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (it.kind === "task") onOpenTask(it.id);
+                      else if (it.kind === "delivery") onOpenDelivery(it.id);
+                      else onOpenStock(it.id);
+                    }}
+                  >
+                    Open
+                  </Button>
                 </div>
               </div>
             );
@@ -1327,7 +2712,9 @@ function LiveActivityFeed({ events }: { events: ActivityEvent[] }) {
       </CardHeader>
       <CardContent>
         {events.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">Activity will appear here as you work.</p>
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+            Activity will appear here as you work.
+          </p>
         ) : (
           <ol className="space-y-2 max-h-72 overflow-y-auto pr-1">
             {events.map((e) => (
@@ -1371,14 +2758,18 @@ function StockRiskSummary({ items }: { items: StockItem[] }) {
         <SummaryRow label="Damaged units flagged" count={damaged.length} tone="red" />
         <Separator />
         <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-          {nearExpiry.concat(damaged.filter((d) => !nearExpiry.includes(d))).slice(0, 6).map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2">
-              <span className="truncate">{s.name}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {s.batch} · exp {s.expiry}{s.damagedUnits ? ` · ${s.damagedUnits} dmg` : ""}
-              </span>
-            </div>
-          ))}
+          {nearExpiry
+            .concat(damaged.filter((d) => !nearExpiry.includes(d)))
+            .slice(0, 6)
+            .map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-2">
+                <span className="truncate">{s.name}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {s.batch} · exp {s.expiry}
+                  {s.damagedUnits ? ` · ${s.damagedUnits} dmg` : ""}
+                </span>
+              </div>
+            ))}
         </div>
       </CardContent>
     </Card>
@@ -1396,7 +2787,13 @@ function SummaryRow({ label, count, tone }: { label: string; count: number; tone
   );
 }
 
-function UpcomingEventsCard({ events, onSeeAll }: { events: CalendarEvent[]; onSeeAll: () => void }) {
+function UpcomingEventsCard({
+  events,
+  onSeeAll,
+}: {
+  events: CalendarEvent[];
+  onSeeAll: () => void;
+}) {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = [...events]
     .filter((e) => e.date >= today)
@@ -1408,21 +2805,33 @@ function UpcomingEventsCard({ events, onSeeAll }: { events: CalendarEvent[]; onS
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <CalendarDays className="size-4" /> Upcoming events
         </CardTitle>
-        <Button size="sm" variant="ghost" onClick={onSeeAll}>See all</Button>
+        <Button size="sm" variant="ghost" onClick={onSeeAll}>
+          See all
+        </Button>
       </CardHeader>
       <CardContent className="space-y-2">
         {upcoming.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">No upcoming events.</p>
+          <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+            No upcoming events.
+          </p>
         ) : (
           upcoming.map((e) => (
             <div key={e.id} className="rounded-md border p-2 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <p className="font-medium truncate">{e.important ? "★ " : ""}{e.title}</p>
+                <p className="font-medium truncate">
+                  {e.important ? "★ " : ""}
+                  {e.title}
+                </p>
                 <span className="text-[10px] uppercase text-muted-foreground">{e.type}</span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                {new Date(e.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
-                {e.time ? ` · ${e.time}` : ""}{e.owner ? ` · ${e.owner}` : ""}
+                {new Date(e.date + "T00:00:00").toLocaleDateString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}
+                {e.time ? ` · ${e.time}` : ""}
+                {e.owner ? ` · ${e.owner}` : ""}
               </p>
             </div>
           ))
