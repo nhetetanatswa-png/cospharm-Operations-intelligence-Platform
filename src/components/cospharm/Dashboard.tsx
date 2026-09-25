@@ -46,6 +46,7 @@ import { NotesDigest } from "./NotesDigest";
 import { EmergencyOrdersBanner } from "./EmergencyOrdersBanner";
 import { RegulatoryModule } from "./RegulatoryModule";
 import { HRModule } from "./HRModule";
+import { InventoryModule } from "./InventoryModule";
 import { Shield, HeartHandshake } from "lucide-react";
 import {
   deliveryStatusBadge,
@@ -726,7 +727,8 @@ export function CospharmDashboard() {
             <TabsTrigger value="overview" className="gap-1.5"><LayoutDashboard className="size-4" /> Overview</TabsTrigger>
             <TabsTrigger value="deliveries" className="gap-1.5"><Truck className="size-4" /> Deliveries</TabsTrigger>
             <TabsTrigger value="tasks" className="gap-1.5"><ClipboardList className="size-4" /> Tasks</TabsTrigger>
-            <TabsTrigger value="stock" className="gap-1.5"><Boxes className="size-4" /> Stock</TabsTrigger>
+            <TabsTrigger value="inventory" className="gap-1.5"><Boxes className="size-4" /> Inventory</TabsTrigger>
+            <TabsTrigger value="stock" className="gap-1.5"><Package className="size-4" /> Daily Stock</TabsTrigger>
             <TabsTrigger value="marketer" className="gap-1.5" disabled={!can(role, "marketer.view") && role !== "marketer" && role !== "telesales" && role !== "marketing_lead" && role !== "marketing_supervisor"}>
               <Megaphone className="size-4" /> Marketer
             </TabsTrigger>
@@ -923,7 +925,12 @@ export function CospharmDashboard() {
             </Card>
           </TabsContent>
 
-          {/* ============ STOCK ============ */}
+          {/* ============ INVENTORY INTELLIGENCE ============ */}
+          <TabsContent value="inventory">
+            <InventoryModule />
+          </TabsContent>
+
+          {/* ============ DAILY STOCK ============ */}
           <TabsContent value="stock">
             <Card>
               <CardHeader>
